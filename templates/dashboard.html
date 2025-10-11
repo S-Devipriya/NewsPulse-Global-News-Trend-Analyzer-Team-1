@@ -35,6 +35,20 @@
         </div>
 
         <!-- News Section -->
+         {% if corrected_query and query %}
+    {% if corrected_query != query %}
+        <div class="alert alert-info mt-3">
+            Showing results for corrected query: 
+            <strong>{{ corrected_query }}</strong> 
+            (You searched for "{{ query }}")
+        </div>
+    {% else %}
+        <div class="alert alert-secondary mt-3">
+            Showing results for: <strong>{{ query }}</strong>
+        </div>
+    {% endif %}
+{% endif %}
+
         <div class="row">
             {% if query %}
                 <h3 class="mb-4">🔎 Search Results for "{{ query }}"</h3>
@@ -45,15 +59,22 @@
 
         <div class="row">
             {% if news %}
-                {% for item in news %}
+                {% for article in news %}
                     <div class="col-md-4 mb-4">
                         <div class="card h-100 shadow-sm">
                             {% if item.imageurl %}
                                 <img src="{{ item.imageurl }}" class="card-img-top" alt="News Image">
                             {% endif %}
                             <div class="card-body">
-                                <h5 class="card-title">{{ item.title }}</h5>
-                                <p class="card-text">{{ item.description or "No description available." }}</p>
+                                <h5 class="card-title">{{ article.title }}</h5>
+                                <p class="card-text">
+                                    <strong>Original:</strong><br>
+                                    {{ article.description or "No description available." }}
+                                </p>
+                                <p class="card-text text-success">
+                                    <strong>Cleaned:</strong><br>
+                                    {{ article.clean_description or "No cleaned text available." }}
+                                </p>
                             </div>
                             <div class="card-footer">
                                 <small class="text-muted">{{ item.source }} | {{ item.publishedAt}}</small><br>
@@ -63,7 +84,7 @@
                     </div>
                 {% endfor %}
             {% else %}
-                <p class="text-center">⚠️ No news available.</p>
+                <p class="text-center">⚠ No news available.</p>
             {% endif %}
         </div>
     </div>
