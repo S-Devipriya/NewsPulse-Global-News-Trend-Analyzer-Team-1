@@ -9,9 +9,31 @@ from dotenv import load_dotenv
 import requests
 import mysql.connector
 from datetime import datetime
-from text_processing import preprocess_text  # Import preprocessing function
 
 load_dotenv()
+
+def create_database():
+    conn = mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST"),
+        port=int(os.getenv("MYSQL_PORT")),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD")
+    )
+    cursor = conn.cursor()
+    cursor.execute('''CREATE DATABASE IF NOT EXISTS newsdb;''')
+    cursor.execute('USE newsdb;')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS news (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title TEXT,
+        source VARCHAR(255),
+        publishedAt DATETIME,
+        url LONGTEXT,
+        description TEXT,
+        imageurl TEXT);''')
+   
+    conn.commit()
+    return conn
 
 def connect_db():
     return mysql.connector.connect(
@@ -21,6 +43,14 @@ def connect_db():
         password=os.getenv("MYSQL_PASSWORD"),
         database=os.getenv("MYSQL_DB")
     )
+
+def fetch_live_news(topic, num_articles=20):
+    NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+    url = f"https://newsapi.org/v2/everything?q={topic}&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
+    response = requests.get(url)
+    data = response.json()
+    articles = data.get("articles", [])
+    return articles[:num_articles]
 
 def convert_publishedAt(publishedAt_str):
     try:
@@ -40,18 +70,14 @@ def insert_news(article):
         return
     published = convert_publishedAt(article.get("publishedAt"))
 
-    # Preprocess title and description before storing
-    cleaned_title = preprocess_text(article.get("title", ""))
-    cleaned_description = preprocess_text(article.get("description", ""))
-
     cursor.execute(
         "INSERT INTO news (title, source, publishedAt, url, description, imageurl) VALUES (%s, %s, %s, %s, %s, %s)",
         (
-            cleaned_title,
+            article.get("title"),
             article.get("source", {}).get("name"),
             published,
             article.get("url"),
-            cleaned_description,
+            article.get("description"),
             article.get("urlToImage"),
         )
     )
@@ -59,18 +85,15 @@ def insert_news(article):
     cursor.close()
     conn.close()
 
-def fetch_live_news(topic, num_articles=10):
-    NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
-    url = f"https://newsapi.org/v2/everything?q={topic}&pageSize={num_articles}&apiKey={NEWSAPI_KEY}"
-    response = requests.get(url)
-    data = response.json()
-    articles = data.get("articles", [])
-    return articles[:num_articles]
-
 def store_articles(articles):
     for article in articles:
         if article.get("title"):
             insert_news(article)
+
+def fetch_and_store():
+    create_database()
+    articles = fetch_live_news("general")
+    store_articles(articles)
 
 
 # In[ ]:

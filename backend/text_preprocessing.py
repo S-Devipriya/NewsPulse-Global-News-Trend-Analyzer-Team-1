@@ -11,10 +11,9 @@ import spacy
 from textblob import TextBlob
 from nltk.corpus import stopwords
 
-# Load spaCy English model
-nlp = spacy.load("en_core_web_sm")
 nltk.download('stopwords')
 stop_words = set(stopwords.words('english'))
+nlp = spacy.load("en_core_web_sm")
 
 def preprocess_text(text):
     if not text:
