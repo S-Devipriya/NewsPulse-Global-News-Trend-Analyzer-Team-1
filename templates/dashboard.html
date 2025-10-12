@@ -62,8 +62,8 @@
                 {% for article in news %}
                     <div class="col-md-4 mb-4">
                         <div class="card h-100 shadow-sm">
-                            {% if article.image %}
-                                <img src="{{ article.image }}" class="card-img-top" alt="News Image">
+                            {% if article.imageurl %}
+                                <img src="{{ article.imageurl }}" class="card-img-top" alt="News Image">
                             {% else %}
                                 <img src="https://via.placeholder.com/400x200?text=No+Image" class="card-img-top" alt="Placeholder">
                             {% endif %}
@@ -73,13 +73,9 @@
                                     <strong>Original:</strong><br>
                                     {{ article.description or "No description available." }}
                                 </p>
-                                <p class="card-text text-success">
-                                    <strong>Cleaned:</strong><br>
-                                    {{ article.clean_description or "No cleaned text available." }}
-                                </p>
                             </div>
                             <div class="card-footer">
-                                <small class="text-muted">{{ article.source }} | {{ article.publishedAt[:10] }}</small><br>
+                                <small class="text-muted">{{ article.source }} | {{ article.publishedAt}}</small><br>
                                 <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">Read More</a>
                             </div>
                         </div>
