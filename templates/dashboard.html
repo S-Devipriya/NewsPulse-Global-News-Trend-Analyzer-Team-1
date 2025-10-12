@@ -62,8 +62,10 @@
                 {% for article in news %}
                     <div class="col-md-4 mb-4">
                         <div class="card h-100 shadow-sm">
-                            {% if item.imageurl %}
-                                <img src="{{ item.imageurl }}" class="card-img-top" alt="News Image">
+                            {% if article.image %}
+                                <img src="{{ article.image }}" class="card-img-top" alt="News Image">
+                            {% else %}
+                                <img src="https://via.placeholder.com/400x200?text=No+Image" class="card-img-top" alt="Placeholder">
                             {% endif %}
                             <div class="card-body">
                                 <h5 class="card-title">{{ article.title }}</h5>
@@ -77,8 +79,8 @@
                                 </p>
                             </div>
                             <div class="card-footer">
-                                <small class="text-muted">{{ item.source }} | {{ item.publishedAt}}</small><br>
-                                <a href="{{ item.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">Read More</a>
+                                <small class="text-muted">{{ article.source }} | {{ article.publishedAt[:10] }}</small><br>
+                                <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">Read More</a>
                             </div>
                         </div>
                     </div>
