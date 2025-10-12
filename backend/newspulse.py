@@ -37,7 +37,7 @@ def fetch_from_db(search_query):
         sql_query = "SELECT title, source, publishedAt, url, description, imageurl FROM news ORDER BY publishedAt DESC"
         cursor.execute(sql_query)
         
-    articles = cursor.fetchall() if 'articles' not in locals() else articles
+    articles = cursor.fetchall()
     connection.close()
     return articles
 

@@ -33,7 +33,8 @@ def create_database():
         imageurl TEXT);''')
    
     conn.commit()
-    return conn
+    conn.close()
+    return
 
 def connect_db():
     return mysql.connector.connect(
@@ -44,9 +45,10 @@ def connect_db():
         database=os.getenv("MYSQL_DB")
     )
 
-def fetch_live_news(topic, num_articles=20):
+def fetch_live_news(topic=None, num_articles=20):
     NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-    url = f"https://newsapi.org/v2/everything?q={topic}&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
+    url = f"https://newsapi.org/v2/top-headlines?language=en&pageSize={int(num_articles)}&apiKey={NEWS_API_KEY}"
+    #url = f"https://newsapi.org/v2/everything?q={topic}&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
     response = requests.get(url)
     data = response.json()
     articles = data.get("articles", [])
@@ -54,8 +56,7 @@ def fetch_live_news(topic, num_articles=20):
 
 def convert_publishedAt(publishedAt_str):
     try:
-        dt = datetime.strptime(publishedAt_str, "%Y-%m-%dT%H:%M:%SZ")
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
+        return datetime.strptime(publishedAt_str, "%Y-%m-%dT%H:%M:%SZ")
     except Exception:
         return None
 
@@ -92,7 +93,7 @@ def store_articles(articles):
 
 def fetch_and_store():
     create_database()
-    articles = fetch_live_news("general")
+    articles = fetch_live_news()
     store_articles(articles)
 
 
