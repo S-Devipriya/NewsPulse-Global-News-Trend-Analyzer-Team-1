@@ -23,12 +23,7 @@
         <div class="card shadow-sm mb-4">
             <div class="card-body">
                 <form method="POST" class="d-flex">
-                    <input type="text" name="query" class="form-control me-2" placeholder="Enter keyword (e.g. AI, Sports, India)">
-                    <select name="page_size" class="form-select me-2" style="max-width: 150px;">
-                        <option value="5">5 articles</option>
-                        <option value="10">10 articles</option>
-                        <option value="15">15 articles</option>
-                    </select>
+                    <input type="text" name="query" class="form-control me-2" placeholder="Enter search term...">
                     <button type="submit" class="btn btn-primary">Search</button>
                 </form>
             </div>
@@ -70,9 +65,13 @@
                             <div class="card-body">
                                 <h5 class="card-title">{{ article.title }}</h5>
                                 <p class="card-text">
-                                    <strong>Original:</strong><br>
                                     {{ article.description or "No description available." }}
                                 </p>
+                            </div>
+                            <div>
+                                {% if article.keywords %}
+                                    <p class="card-text"><strong>Keywords:</strong> {{ article.keywords }}</p>
+                                {% endif %}
                             </div>
                             <div class="card-footer">
                                 <small class="text-muted">{{ article.source }} | {{ article.publishedAt}}</small><br>

@@ -30,7 +30,8 @@ def create_database():
         publishedAt DATETIME,
         url LONGTEXT,
         description TEXT,
-        imageurl TEXT);''')
+        imageurl TEXT,
+        keywords VARCHAR(255));''')
    
     conn.commit()
     conn.close()

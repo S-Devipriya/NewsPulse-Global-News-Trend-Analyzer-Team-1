@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, session
 import mysql.connector as mysql
 from text_preprocessing import preprocess_text
 import fetch_news
+import keyword_extractor
 import users
 import os
 from dotenv import load_dotenv
@@ -9,7 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def fetch_from_db(search_query):
-    fetch_news.fetch_and_store() 
+    fetch_news.fetch_and_store()
+    keyword_extractor.extract_and_store_keywords()
     try:
         connection = mysql.connect(
             host = os.getenv("MYSQL_HOST"),
@@ -26,7 +28,7 @@ def fetch_from_db(search_query):
         cleaned_search_query = preprocess_text(search_query)
         
         if cleaned_search_query:
-            sql_query = "SELECT title, source, publishedAt, url, description, imageurl FROM news WHERE "
+            sql_query = "SELECT title, source, publishedAt, url, description, imageurl, keywords FROM news WHERE "
             sql_query += "title LIKE %s OR description LIKE %s"
             sql_query += " ORDER BY publishedAt DESC"
             
@@ -34,7 +36,7 @@ def fetch_from_db(search_query):
         else:
             articles = []
     else:
-        sql_query = "SELECT title, source, publishedAt, url, description, imageurl FROM news ORDER BY publishedAt DESC"
+        sql_query = "SELECT title, source, publishedAt, url, description, imageurl, keywords FROM news ORDER BY publishedAt DESC"
         cursor.execute(sql_query)
         
     articles = cursor.fetchall()
