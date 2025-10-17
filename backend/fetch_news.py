@@ -21,7 +21,9 @@ def create_database():
     )
     cursor = conn.cursor()
     cursor.execute('''CREATE DATABASE IF NOT EXISTS newsdb;''')
+    conn.commit()
     cursor.execute('USE newsdb;')
+    conn.commit()
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS news (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -31,8 +33,9 @@ def create_database():
         url LONGTEXT,
         description TEXT,
         imageurl TEXT,
-        keywords VARCHAR(255));''')
-   
+        keywords VARCHAR(255),
+        topic VARCHAR(255));''')
+    print("Database and table ensured.")
     conn.commit()
     conn.close()
     return
@@ -46,7 +49,7 @@ def connect_db():
         database=os.getenv("MYSQL_DB")
     )
 
-def fetch_live_news(topic=None, num_articles=20):
+def fetch_live_news(topic=None, num_articles=10):
     NEWS_API_KEY = os.getenv("NEWS_API_KEY")
     url = f"https://newsapi.org/v2/top-headlines?language=en&pageSize={int(num_articles)}&apiKey={NEWS_API_KEY}"
     #url = f"https://newsapi.org/v2/everything?q={topic}&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
@@ -93,7 +96,6 @@ def store_articles(articles):
             insert_news(article)
 
 def fetch_and_store():
-    create_database()
     articles = fetch_live_news()
     store_articles(articles)
 

@@ -100,6 +100,7 @@ def logout():
 
 @app.route("/")
 def home():
+    fetch_news.create_database()
     return render_template("home.html")
 
 if __name__ == "__main__":

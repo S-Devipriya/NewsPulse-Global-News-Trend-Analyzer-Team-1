@@ -15,7 +15,7 @@ def extract_and_store_keywords():
     conn = connect_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, title, description FROM news")
+    cursor.execute("SELECT id, title, description FROM news WHERE keywords IS NULL OR keywords = ''")
     rows = cursor.fetchall()
     raw_news = pd.DataFrame(rows, columns=['id', 'title', 'description'])
 
