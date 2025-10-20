@@ -11,7 +11,11 @@ import spacy
 from textblob import TextBlob
 from nltk.corpus import stopwords
 
-nltk.download('stopwords')
+try:
+    stopwords.words('english')
+except LookupError:
+    nltk.download('stopwords')
+
 stop_words = set(stopwords.words('english'))
 nlp = spacy.load("en_core_web_sm")
 
