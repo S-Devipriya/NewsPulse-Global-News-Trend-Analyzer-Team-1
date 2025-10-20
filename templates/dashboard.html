@@ -40,7 +40,8 @@
         }
         .btn {
             color: #ffffff;
-            background-color: rgba(11, 60, 133)
+            background-color: rgba(11, 60, 133);
+            margin: 10px;
         }
         .btn-custom {
             color: rgb(255, 255, 255);
@@ -68,6 +69,7 @@
             </a>
             <div class="d-flex align-items-center">
                 <span class="navbar-text me-3">Welcome, {{ user }}</span>
+                <a href="/profile" class="btn btn-primary">Profile</a>
                 <a href="/logout" class="btn btn-primary">Logout</a>
             </div>
         </div>
