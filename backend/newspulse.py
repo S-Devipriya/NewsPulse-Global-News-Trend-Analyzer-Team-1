@@ -47,7 +47,7 @@ def fetch_from_db(search_query):
     return articles
 
 
-app = Flask(__name__, template_folder='../templates')
+app = Flask(__name__, template_folder='../templates', static_folder='../static')
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 @app.route("/register", methods=["GET", "POST"])
