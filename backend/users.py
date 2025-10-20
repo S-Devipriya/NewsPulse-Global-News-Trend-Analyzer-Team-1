@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 from datetime import datetime, timedelta
+import user_profile
 
 load_dotenv()
 
@@ -18,17 +19,19 @@ def connect_db():
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(255) UNIQUE,
-        password LONGTEXT);''')
+        email VARCHAR(255) UNIQUE,
+        password LONGTEXT,
+        createdAt DATETIME,
+        updatedAt DATETIME);''')
     conn.commit()
     return conn
 
-def register_user(username, password):
+def register_user(email, password):
     conn = connect_db()
     cursor = conn.cursor()
     
     # Check if user already exists
-    cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
     if cursor.fetchone():
         cursor.close()
         conn.close()
@@ -36,10 +39,12 @@ def register_user(username, password):
 
     # Hash the password before storing
     hashed_password = generate_password_hash(password)
+    now = datetime.now()
     
     try:
-        cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, hashed_password))
+        cursor.execute("INSERT INTO users (email, password, createdAt) VALUES (%s, %s, %s)", (email, hashed_password, now))
         conn.commit()
+        user_profile.update_user_profile(cursor.lastrowid, "", "", "")
     except mysql.connector.Error as err:
         print(f"Error: {err}")
         return False
@@ -48,27 +53,33 @@ def register_user(username, password):
         conn.close()
     return True # Registration successful
 
-def login_user(username, password, secret_key):
+def login_user(email, password, secret_key):
     conn = connect_db()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
     user = cursor.fetchone()
-    cursor.close()
+    cursor.close
     conn.close()
 
     if user and check_password_hash(user['password'], password):
         try:
+            conn = user_profile.connect_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT username FROM user_preferences WHERE user_id = %s", (user['id'],))
+            username = cursor.fetchone()
             payload = {
                 'exp': datetime.utcnow() + timedelta(days=1),
                 'iat': datetime.utcnow(),
                 'sub': str(user['id']),
-                'username': user['username']
+                'username': username[0] if username else ""
             }
             token = jwt.encode(
                 payload,
                 secret_key,
                 algorithm='HS256'
             )
+            cursor.close()
+            conn.close()
             return token
         except Exception as e:
             print(f"Error encoding JWT: {e}")

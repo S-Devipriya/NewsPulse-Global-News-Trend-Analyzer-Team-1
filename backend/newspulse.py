@@ -3,12 +3,14 @@ import mysql.connector as mysql
 from text_preprocessing import preprocess_text
 import fetch_news
 import keyword_extractor
+import user_profile
 import topic_selection
 import users
 import os
 from dotenv import load_dotenv
 from functools import wraps
 import jwt
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -77,35 +79,71 @@ def token_required(f):
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        username = request.form["username"]
+        email = request.form["email"]
         password = request.form["password"]
-        if users.register_user(username, password):
-            flash("Registration successful! Please log in.", "success")
+        if users.register_user(email, password):
+            flash("Registration successful! Please Login.", "success")
             return redirect("/login")
         else:
-            flash("Username already exists. Please choose another.", "danger")
+            flash("Email already exists. Please choose another.", "danger")
             return redirect("/register")
     return render_template("register.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form["username"]
+        email = request.form["email"]
         password = request.form["password"]
         
         secret_key = os.getenv("FLASK_SECRET_KEY")
         
         # Pass the key to the login function
-        token = users.login_user(username, password, secret_key)
+        token = users.login_user(email, password, secret_key)
         
         if token:
             response = make_response(redirect('/dashboard'))
             response.set_cookie('token', token, httponly=True, samesite='Lax')
             return response
         else:
-            flash("Invalid username or password!", "danger")
+            flash("Invalid email or password!", "danger")
             return redirect("/login")
     return render_template("login.html")
+
+@app.route("/profile", methods=["GET", "POST"])
+@token_required
+def profile():
+    user_id = g.user_id
+    if request.method == "POST":
+        username = request.form.get("username")
+        language = request.form.get("language")
+        interests = request.form.get("interests")
+        
+        user_profile.update_user_profile(user_id, username, language, interests)
+        
+        #Issue a new token with the updated username
+        try:
+            secret_key = current_app.config['SECRET_KEY']
+            new_payload = {
+                'exp': datetime.utcnow() + timedelta(days=1),
+                'iat': datetime.utcnow(),
+                'sub': str(g.user_id),
+                'username': username # Use the new username from the form
+            }
+            new_token = jwt.encode(new_payload, secret_key, algorithm='HS256')
+            # Create a response object to set the new cookie
+            response = make_response(redirect("/profile"))
+            response.set_cookie('token', new_token, httponly=True, samesite='Lax')
+            flash("Profile updated successfully!", "success")
+            return response
+
+        except Exception as e:
+            print(f"Error re-issuing token: {e}")
+            flash("Profile updated, but session could not be refreshed. Please log in again.", "warning")
+            return redirect("/login")
+
+    # For GET request, fetch and display current profile
+    user = user_profile.get_user_profile(user_id)
+    return render_template("profile.html", user=user)
 
 @app.route("/dashboard", methods=["GET", "POST"])
 @token_required

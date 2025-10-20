@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>User Profile</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-image: url('/static/images/background.png');
+      background-size: cover;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+    }
+    .profile-card {
+      background-color: rgb(151, 230, 237);
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0px 6px 20px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 500px;
+    }
+    .form-icon {
+      display: block;
+      margin: 0 auto 20px auto;
+      width: 100px;
+    }
+    .btn {
+      color:rgb(255, 255, 255);
+      background-color: rgba(24, 45, 150, 0.803);
+      margin: 10px;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="profile-card">
+    <img src="/static/images/icon.png" alt="Icon" class="form-icon">
+    <h3 class="text-center mb-4">User Profile</h3>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} text-center" role="alert">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/profile">
+      <div class="mb-3">
+        <label for="username" class="form-label">Username</label>
+        <input type="text" id="username" name="username" class="form-control" value="{{ user.username or '' }}" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Preferred Language</label>
+        <div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="language" id="lang_en" value="en" {% if user.language == 'en' or not user.language %}checked{% endif %}>
+            <label class="form-check-label" for="lang_en">English</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="language" id="lang_hi" value="hi" {% if user.language == 'hi' %}checked{% endif %}>
+            <label class="form-check-label" for="lang_hi">Hindi</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="interests" class="form-label">Interests</label>
+        <select id="interests" name="interests" class="form-select">
+          <option value="World Politics & Goverance" {% if user.interests == 'World Politics & Goverance' %}selected{% endif %}>World Politics & Goverance</option>
+          <option value="Sports & Entertainment" {% if user.interests == 'Sports & Entertainment' %}selected{% endif %}>Sports & Entertainment</option>
+          <option value="Science & Technology" {% if user.interests == 'Science & Technology' %}selected{% endif %}>Science & Technology</option>
+          <option value="Health & Lifestyle" {% if user.interests == 'Health & Lifestyle' %}selected{% endif %}>Health & Lifestyle</option>
+          <option value="Business & Economy" {% if user.interests == 'Business & Economy' %}selected{% endif %}>Business & Economy</option>
+        </select>
+      </div>
+
+      <div class="text-center">
+        <button type="submit" class="btn btn-primary">Update Profile</button>
+      </div>
+    </form>
+
+    <div class="text-center">
+      <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+    </div>
+  </div>
+</body>
+</html>
