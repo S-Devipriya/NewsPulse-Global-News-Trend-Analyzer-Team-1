@@ -12,3 +12,5 @@ keybert>=0.7.0
 sentence-transformers>=2.2.0
 transformers>=4.30.0
 torch>=1.13.0
+PyJWT>=2.6.0
+Werkzeug>=2.2.0
