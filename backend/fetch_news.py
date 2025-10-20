@@ -32,6 +32,7 @@ def create_database():
         publishedAt DATETIME,
         url LONGTEXT,
         description TEXT,
+        content LONGTEXT,
         imageurl TEXT,
         keywords VARCHAR(255),
         topic VARCHAR(255));''')
@@ -76,13 +77,14 @@ def insert_news(article):
     published = convert_publishedAt(article.get("publishedAt"))
 
     cursor.execute(
-        "INSERT INTO news (title, source, publishedAt, url, description, imageurl) VALUES (%s, %s, %s, %s, %s, %s)",
+        "INSERT INTO news (title, source, publishedAt, url, description, content, imageurl) VALUES (%s, %s, %s, %s, %s, %s, %s)",
         (
             article.get("title"),
             article.get("source", {}).get("name"),
             published,
             article.get("url"),
             article.get("description"),
+            article.get("content"),
             article.get("urlToImage"),
         )
     )

@@ -67,11 +67,11 @@
                                 <p class="card-text">
                                     {{ article.description or "No description available." }}
                                 </p>
-                            </div>
-                            <div>
-                                {% if article.keywords %}
-                                    <p class="card-text"><strong>Keywords:</strong> {{ article.keywords }}</p>
-                                {% endif %}
+                                <p class="card-text">
+                                    <strong>Keywords:</strong> {{ article.keywords }}
+                                </p>
+                                <p class="card-text">
+                                    <strong>Topic:</strong> {{ article.topic }}</p>
                             </div>
                             <div class="card-footer">
                                 <small class="text-muted">{{ article.source }} | {{ article.publishedAt}}</small><br>
