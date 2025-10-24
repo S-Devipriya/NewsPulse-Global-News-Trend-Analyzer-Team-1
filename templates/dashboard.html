@@ -56,6 +56,31 @@
             color: #0b3c85;
             font-weight: bold;
         }
+        /* Sentiment & NER custom styles */
+        .sentiment-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.93em;
+            color: #fff;
+            margin-left: 4px;
+        }
+        .sentiment-badge.positive { background: #25bf49; }
+        .sentiment-badge.neutral { background: #b0bdcb }
+        .sentiment-badge.negative { background: #960210; }
+        .ner-label { font-size: 0.96em; color: #777; font-weight: 600; }
+        .ner-chip {
+            display: inline-block;
+            background: #ececec;
+            color: #222;
+            border-radius: 10px;
+            padding: 2px 7px;
+            margin: 1px 4px 1px 0;
+            font-size: 0.93em;
+            border: 1px solid #bcbcbc;
+        }
+        .ner-chip.person { background: #c3eaff; border-color: #53b0e7; }
+        .ner-chip.org { background: #e0ffd4; border-color: #8fd37b; }
+        .ner-chip.location { background: #fff5d7; border-color: #e8c467; }
     </style>
 </head>
 <body>
@@ -115,6 +140,54 @@
                                 <p class="card-text">
                                     <strong>Topic:</strong> {{ article.topic }}
                                 </p>
+                                {% endif %}
+
+                                <!-- Sentiment Analysis Display -->
+                                {% if article.sentiment %}
+                                <div class="my-2">
+                                    <strong>Sentiment:</strong>
+                                    <span class="sentiment-badge 
+                                        {% if article.sentiment.overall == "Positive" %}positive
+                                        {% elif article.sentiment.overall == "Negative" %}negative
+                                        {% else %}neutral
+                                        {% endif %}">
+                                        {{ article.sentiment.overall }}
+                                    </span>
+                                    <div class="progress mt-2" style="height: 12px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ article.sentiment.positive }}%"
+                                            title="Positive"></div>
+                                        <div class="progress-bar bg-warning text-dark" role="progressbar" style="width: {{ article.sentiment.neutral }}%"
+                                            title="Neutral"></div>
+                                        <div class="progress-bar bg-danger" role="progressbar" style="width: {{ article.sentiment.negative }}%"
+                                            title="Negative"></div>
+                                    </div>
+                                    <small class="text-muted">Positive: {{ article.sentiment.positive }}% | Neutral: {{ article.sentiment.neutral }}% | Negative: {{ article.sentiment.negative }}%</small>
+                                </div>
+                                {% endif %}
+
+                                <!-- Named Entities Display -->
+                                {% if article.entities %}
+                                <div class="mt-2">
+                                    <strong>Entities:</strong>
+                                    <div class="mb-1">
+                                        <span class="ner-label">People:</span>
+                                        {% for person in article.entities.people %}
+                                            <span class="ner-chip person">{{ person }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mb-1">
+                                        <span class="ner-label">Organizations:</span>
+                                        {% for org in article.entities.organizations %}
+                                            <span class="ner-chip org">{{ org }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div>
+                                        <span class="ner-label">Locations:</span>
+                                        {% for loc in article.entities.locations %}
+                                            <span class="ner-chip location">{{ loc }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                                 {% endif %}
                             </div>
                             <div class="card-footer" style="background:none; border-top: 1px solid rgba(0,0,0,0.1);">
