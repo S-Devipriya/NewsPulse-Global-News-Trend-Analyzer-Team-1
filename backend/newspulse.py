@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, flash, make_response, g, current_app
+from flask import Flask, render_template, request, redirect, flash, make_response, g, current_app, jsonify
 import mysql.connector as mysql
 from text_preprocessing import preprocess_text
 import fetch_news
@@ -12,13 +12,16 @@ from functools import wraps
 import jwt
 from datetime import datetime, timedelta
 
+# Import sentiment and NER logic
+from sentiment import analyze_sentiment, save_sentiment
+from ner import extract_entities, save_entities
+
 load_dotenv()
 
 def fetch_from_db(search_query):
     fetch_news.fetch_and_store()
     keyword_extractor.extract_and_store_keywords()
     topic_selection.analyze_topics()
-
     try:
         connection = mysql.connect(
             host = os.getenv("MYSQL_HOST"),
@@ -30,26 +33,25 @@ def fetch_from_db(search_query):
         cursor = connection.cursor(dictionary=True)
     except mysql.Error as err:
         print(f"Error: {err}")
-        
+        articles = []
+        return articles
+
     if search_query:
         cleaned_search_query = preprocess_text(search_query)
-        
         if cleaned_search_query:
-            sql_query = "SELECT title, source, publishedAt, url, description, imageurl, keywords, topic FROM news WHERE "
+            sql_query = "SELECT id, title, source, publishedAt, url, description, imageurl, keywords, topic FROM news WHERE "
             sql_query += "title LIKE %s OR description LIKE %s"
             sql_query += " ORDER BY publishedAt DESC"
-            
             cursor.execute(sql_query, (f"%{cleaned_search_query}%", f"%{cleaned_search_query}%"))
         else:
             articles = []
     else:
-        sql_query = "SELECT title, source, publishedAt, url, description, imageurl, keywords, topic FROM news ORDER BY publishedAt DESC"
+        sql_query = "SELECT id, title, source, publishedAt, url, description, imageurl, keywords, topic FROM news ORDER BY publishedAt DESC"
         cursor.execute(sql_query)
-        
+    
     articles = cursor.fetchall()
     connection.close()
     return articles
-
 
 app = Flask(__name__, template_folder='../templates', static_folder='../static')
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
@@ -97,7 +99,6 @@ def login():
         
         secret_key = os.getenv("FLASK_SECRET_KEY")
         
-        # Pass the key to the login function
         token = users.login_user(email, password, secret_key)
         
         if token:
@@ -120,28 +121,23 @@ def profile():
         
         user_profile.update_user_profile(user_id, username, language, interests)
         
-        #Issue a new token with the updated username
         try:
             secret_key = current_app.config['SECRET_KEY']
             new_payload = {
                 'exp': datetime.utcnow() + timedelta(days=1),
                 'iat': datetime.utcnow(),
                 'sub': str(g.user_id),
-                'username': username # Use the new username from the form
+                'username': username
             }
             new_token = jwt.encode(new_payload, secret_key, algorithm='HS256')
-            # Create a response object to set the new cookie
             response = make_response(redirect("/profile"))
             response.set_cookie('token', new_token, httponly=True, samesite='Lax')
             flash("Profile updated successfully!", "success")
             return response
-
         except Exception as e:
             print(f"Error re-issuing token: {e}")
             flash("Profile updated, but session could not be refreshed. Please log in again.", "warning")
             return redirect("/login")
-
-    # For GET request, fetch and display current profile
     user = user_profile.get_user_profile(user_id)
     return render_template("profile.html", user=user)
 
@@ -150,17 +146,51 @@ def profile():
 def dashboard():
     query = request.form.get("query", "latest").strip()
     news_items = fetch_from_db(query)
-    
+    enriched_news = []
+    for article in news_items:
+        text = f"{article.get('title', '')}. {article.get('description', '')}"
+        article_id = article['id']
+        # Calculate and store sentiment
+        sentiment = analyze_sentiment(text)
+        save_sentiment(article_id, sentiment)
+        # Calculate and store entities
+        entities_dict = extract_entities(text)
+        save_entities(article_id, entities_dict['entities'])
+        # For displaying
+        article['sentiment'] = sentiment
+        article['entities'] = entities_dict
+        enriched_news.append(article)
     return render_template(
         "dashboard.html",
-        news=news_items,
+        news=enriched_news,
         user=g.username,
         query=query
     )
 
+@app.route("/analyze-sentiment", methods=["POST"])
+@token_required
+def sentiment_api():
+    data = request.get_json()
+    text = data.get('text', '')
+    article_id = data.get('article_id')  # expects article_id in the payload for storage
+    sentiment = analyze_sentiment(text)
+    if article_id:
+        save_sentiment(article_id, sentiment)
+    return jsonify(sentiment)
+
+@app.route("/extract-entities", methods=["POST"])
+@token_required
+def ner_api():
+    data = request.get_json()
+    text = data.get('text', '')
+    article_id = data.get('article_id')  # expects article_id in the payload for storage
+    entities_dict = extract_entities(text)
+    if article_id:
+        save_entities(article_id, entities_dict['entities'])
+    return jsonify(entities_dict)
+
 @app.route("/logout")
 def logout():
-    # Clear the token cookie upon logout
     response = make_response(redirect('/login'))
     response.set_cookie('token', '', expires=0)
     flash("You have been logged out.", "success")
