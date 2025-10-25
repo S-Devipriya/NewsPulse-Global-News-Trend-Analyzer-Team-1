@@ -46,6 +46,16 @@ def save_sentiment(article_id, sentiment_dict):
         database = os.getenv("MYSQL_DB")
     )
     cursor = connection.cursor()
+    query = '''CREATE TABLE IF NOT EXISTS sentiments (
+               id INT AUTO_INCREMENT PRIMARY KEY,
+               article_id INT,
+               positive FLOAT,
+               neutral FLOAT,
+               negative FLOAT,
+               FOREIGN KEY (article_id) REFERENCES news(id)
+           );'''
+    cursor.execute(query)
+    connection.commit()
     query = '''INSERT INTO sentiments (article_id, positive, neutral, negative)
                VALUES (%s, %s, %s, %s)'''
     cursor.execute(query, (
