@@ -43,6 +43,16 @@ def save_entities(article_id, entities_list):
         database = os.getenv("MYSQL_DB")
     )
     cursor = connection.cursor()
+    query = '''CREATE TABLE IF NOT EXISTS entities (
+               id INT AUTO_INCREMENT PRIMARY KEY,
+               article_id INT,
+               name VARCHAR(255),
+               type VARCHAR(100),
+               confidence FLOAT,
+               FOREIGN KEY (article_id) REFERENCES news(id)
+           );'''
+    cursor.execute(query)
+    connection.commit()
     query = '''INSERT INTO entities (article_id, name, type, confidence)
                VALUES (%s, %s, %s, %s)'''
     for ent in entities_list:
