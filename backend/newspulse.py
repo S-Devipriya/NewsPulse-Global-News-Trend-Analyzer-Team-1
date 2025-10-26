@@ -189,6 +189,53 @@ def ner_api():
         save_entities(article_id, entities_dict['entities'])
     return jsonify(entities_dict)
 
+# NEW: Autocomplete/Word Suggestor API
+@app.route('/api/suggest')
+def suggest():
+    query = request.args.get('q', '').strip().lower()
+    if not query or len(query) < 2:
+        return jsonify([])
+    
+    try:
+        connection = mysql.connect(
+            host = os.getenv("MYSQL_HOST"),
+            port = int(os.getenv("MYSQL_PORT")),
+            user = os.getenv("MYSQL_USER"),
+            password = os.getenv("MYSQL_PASSWORD"),
+            database = os.getenv("MYSQL_DB")
+        )
+        cursor = connection.cursor()
+        
+        # Get topic suggestions
+        cursor.execute("""
+            SELECT DISTINCT topic FROM news
+            WHERE LOWER(topic) LIKE %s AND topic IS NOT NULL
+            LIMIT 5
+        """, (f"%{query}%",))
+        topics = [row[0] for row in cursor.fetchall() if row[0]]
+
+        # Get keyword suggestions - assuming keywords is comma-separated
+        cursor.execute("""
+            SELECT DISTINCT keywords FROM news
+            WHERE LOWER(keywords) LIKE %s AND keywords IS NOT NULL
+            LIMIT 10
+        """, (f"%{query}%",))
+        keywords = []
+        for row in cursor.fetchall():
+            for word in row[0].split(","):
+                word = word.strip()
+                if word and query in word.lower() and word not in keywords:
+                    keywords.append(word)
+        
+        # Combine, dedupe, and limit
+        suggestions = list(dict.fromkeys(topics + keywords))[:5]
+        connection.close()
+        return jsonify(suggestions)
+        
+    except mysql.Error as err:
+        print(f"Database error in suggestions: {err}")
+        return jsonify([])
+
 @app.route("/logout")
 def logout():
     response = make_response(redirect('/login'))
