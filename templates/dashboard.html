@@ -56,7 +56,6 @@
             color: #0b3c85;
             font-weight: bold;
         }
-        /* Sentiment & NER custom styles */
         .sentiment-badge {
             padding: 2px 8px;
             border-radius: 12px;
@@ -81,10 +80,39 @@
         .ner-chip.person { background: #c3eaff; border-color: #53b0e7; }
         .ner-chip.org { background: #e0ffd4; border-color: #8fd37b; }
         .ner-chip.location { background: #fff5d7; border-color: #e8c467; }
+        .mic-btn {
+            background: #f0f4fb;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            padding: 4px;
+            margin-left: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .mic-btn:hover {
+            background: #d2e7ff;
+        }
+        .mic-btn img {
+            vertical-align: middle;
+            width: 26px;
+            height: 26px;
+        }
+        /* --- AUTOCOMPLETE SUGGESTION DROPDOWN --- */
+        .suggest-item {
+            cursor: pointer;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 4px 10px;
+        }
+        .suggest-item:hover {
+            background: #e9f2ff;
+        }
     </style>
 </head>
 <body>
-
     <!-- Navbar -->
     <nav class="navbar navbar-custom">
         <div class="container-fluid d-flex justify-content-between">
@@ -104,10 +132,15 @@
         <!-- Search Box -->
         <div class="card card-custom mb-4">
             <div class="card-body">
-                <form method="POST" class="d-flex">
-                    <input type="text" name="query" class="form-control me-2" placeholder="Search for news, topics, or keywords...">
-                    <button type="submit" class="btn btn-custom">Search</button>
+                <form method="POST" class="d-flex align-items-center">
+                    <input type="text" id="searchInput" name="query" class="form-control me-2" placeholder="Search for news, topics, or keywords...">
+                    <button type="submit" class="btn btn-custom me-2">Search</button>
+                    <button type="button" id="micButton" class="mic-btn" title="Voice Search">
+                        <img src="/static/images/mic.jpg" alt="Mic">
+                    </button>
                 </form>
+                <!-- ==== AUTOCOMPLETE SUGGESTIONS BELOW FORM ==== -->
+                <div id="suggestion-list" style="position:relative;"></div>
             </div>
         </div>
 
@@ -121,81 +154,78 @@
         <div class="row">
             {% if news %}
                 {% for article in news %}
-                    <div class="col-md-4 mb-4">
-                        <div class="card h-100 card-custom">
-                            {% if article.imageurl %}
-                                <img src="{{ article.imageurl }}" class="card-img-top" alt="News Image" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 card-custom">
+                        {% if article.imageurl %}
+                            <img src="{{ article.imageurl }}" class="card-img-top" alt="News Image" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ article.title }}</h5>
+                            <p class="card-text">
+                                {{ article.description or "No description available." }}
+                            </p>
+                            {% if article.keywords %}
+                            <p class="card-text">
+                                <strong>Keywords:</strong> {{ article.keywords }}
+                            </p>
                             {% endif %}
-                            <div class="card-body">
-                                <h5 class="card-title">{{ article.title }}</h5>
-                                <p class="card-text">
-                                    {{ article.description or "No description available." }}
-                                </p>
-                                {% if article.keywords %}
-                                <p class="card-text">
-                                    <strong>Keywords:</strong> {{ article.keywords }}
-                                </p>
-                                {% endif %}
-                                {% if article.topic %}
-                                <p class="card-text">
-                                    <strong>Topic:</strong> {{ article.topic }}
-                                </p>
-                                {% endif %}
+                            {% if article.topic %}
+                            <p class="card-text">
+                                <strong>Topic:</strong> {{ article.topic }}
+                            </p>
+                            {% endif %}
 
-                                <!-- Sentiment Analysis Display -->
-                                {% if article.sentiment %}
-                                <div class="my-2">
-                                    <strong>Sentiment:</strong>
-                                    <span class="sentiment-badge 
-                                        {% if article.sentiment.overall == "Positive" %}positive
-                                        {% elif article.sentiment.overall == "Negative" %}negative
-                                        {% else %}neutral
-                                        {% endif %}">
-                                        {{ article.sentiment.overall }}
-                                    </span>
-                                    <div class="progress mt-2" style="height: 12px;">
-                                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ article.sentiment.positive }}%"
-                                            title="Positive"></div>
-                                        <div class="progress-bar bg-warning text-dark" role="progressbar" style="width: {{ article.sentiment.neutral }}%"
-                                            title="Neutral"></div>
-                                        <div class="progress-bar bg-danger" role="progressbar" style="width: {{ article.sentiment.negative }}%"
-                                            title="Negative"></div>
-                                    </div>
-                                    <small class="text-muted">Positive: {{ article.sentiment.positive }}% | Neutral: {{ article.sentiment.neutral }}% | Negative: {{ article.sentiment.negative }}%</small>
+                            <!-- Sentiment Analysis Display -->
+                            {% if article.sentiment %}
+                            <div class="my-2">
+                                <strong>Sentiment:</strong>
+                                <span class="sentiment-badge 
+                                    {% if article.sentiment.overall == "Positive" %}positive
+                                    {% elif article.sentiment.overall == "Negative" %}negative
+                                    {% else %}neutral
+                                    {% endif %}">
+                                    {{ article.sentiment.overall }}
+                                </span>
+                                <div class="progress mt-2" style="height: 12px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ article.sentiment.positive }}%;" title="Positive"></div>
+                                    <div class="progress-bar bg-warning text-dark" role="progressbar" style="width: {{ article.sentiment.neutral }}%;" title="Neutral"></div>
+                                    <div class="progress-bar bg-danger" role="progressbar" style="width: {{ article.sentiment.negative }}%;" title="Negative"></div>
                                 </div>
-                                {% endif %}
+                                <small class="text-muted">Positive: {{ article.sentiment.positive }}% | Neutral: {{ article.sentiment.neutral }}% | Negative: {{ article.sentiment.negative }}%</small>
+                            </div>
+                            {% endif %}
 
-                                <!-- Named Entities Display -->
-                                {% if article.entities %}
-                                <div class="mt-2">
-                                    <strong>Entities:</strong>
-                                    <div class="mb-1">
-                                        <span class="ner-label">People:</span>
-                                        {% for person in article.entities.people %}
-                                            <span class="ner-chip person">{{ person }}</span>
-                                        {% endfor %}
-                                    </div>
-                                    <div class="mb-1">
-                                        <span class="ner-label">Organizations:</span>
-                                        {% for org in article.entities.organizations %}
-                                            <span class="ner-chip org">{{ org }}</span>
-                                        {% endfor %}
-                                    </div>
-                                    <div>
-                                        <span class="ner-label">Locations:</span>
-                                        {% for loc in article.entities.locations %}
-                                            <span class="ner-chip location">{{ loc }}</span>
-                                        {% endfor %}
-                                    </div>
+                            <!-- Named Entities Display -->
+                            {% if article.entities %}
+                            <div class="mt-2">
+                                <strong>Entities:</strong>
+                                <div class="mb-1">
+                                    <span class="ner-label">People:</span>
+                                    {% for person in article.entities.people %}
+                                        <span class="ner-chip person">{{ person }}</span>
+                                    {% endfor %}
                                 </div>
-                                {% endif %}
+                                <div class="mb-1">
+                                    <span class="ner-label">Organizations:</span>
+                                    {% for org in article.entities.organizations %}
+                                        <span class="ner-chip org">{{ org }}</span>
+                                    {% endfor %}
+                                </div>
+                                <div>
+                                    <span class="ner-label">Locations:</span>
+                                    {% for loc in article.entities.locations %}
+                                        <span class="ner-chip location">{{ loc }}</span>
+                                    {% endfor %}
+                                </div>
                             </div>
-                            <div class="card-footer" style="background:none; border-top: 1px solid rgba(0,0,0,0.1);">
-                                <small class="text-muted">{{ article.source }} | {{ article.publishedAt}}</small><br>
-                                <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-custom mt-2">Read More</a>
-                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer" style="background:none; border-top: 1px solid rgba(0,0,0,0.1);">
+                            <small class="text-muted">{{ article.source }} | {{ article.publishedAt}}</small><br>
+                            <a href="{{ article.url }}" target="_blank" class="btn btn-sm btn-custom mt-2">Read More</a>
                         </div>
                     </div>
+                </div>
                 {% endfor %}
             {% else %}
                 <div class="col-12">
@@ -208,5 +238,83 @@
         </div>
     </div>
 
+    <!-- Voice Recognition Script -->
+    <script>
+      const micButton = document.getElementById('micButton');
+      const searchInput = document.getElementById('searchInput');
+      let recognition;
+      if ('webkitSpeechRecognition' in window) {
+          recognition = new webkitSpeechRecognition();
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          recognition.lang = 'en-US';
+
+          micButton.onclick = (e) => {
+              e.preventDefault();
+              recognition.start();
+              searchInput.placeholder = "Listening...";
+              micButton.disabled = true;
+          };
+
+          recognition.onresult = function(event) {
+              searchInput.value = event.results[0][0].transcript;
+              searchInput.placeholder = "Search for news, topics, or keywords...";
+              micButton.disabled = false;
+          };
+
+          recognition.onerror = function(event) {
+              alert("Voice recognition error: " + event.error);
+              searchInput.placeholder = "Search for news, topics, or keywords...";
+              micButton.disabled = false;
+          };
+
+          recognition.onend = function() {
+              searchInput.placeholder = "Search for news, topics, or keywords...";
+              micButton.disabled = false;
+          };
+      } else {
+          // Hide mic button if not supported
+          micButton.style.display = "none";
+      }
+    </script>
+
+    <!-- Autocomplete Suggestion Script -->
+    <script>
+    const suggestionList = document.getElementById('suggestion-list');
+    // Use a helper function for setting value
+    function selectSuggestion(val) {
+        document.getElementById('searchInput').value = val;
+        suggestionList.innerHTML = '';
+        document.getElementById('searchInput').focus();
+    }
+    searchInput.addEventListener('input', function() {
+        const val = this.value.trim();
+        if (val.length < 2) {
+            suggestionList.innerHTML = "";
+            return;
+        }
+        fetch('/api/suggest?q=' + encodeURIComponent(val))
+            .then(res => res.json())
+            .then(data => {
+                if (!data.length) {
+                    suggestionList.innerHTML = "";
+                    return;
+                }
+                suggestionList.innerHTML = data.map(s => `
+                    <div class="suggest-item"
+                        onmousedown="selectSuggestion('${s.replace(/'/g, "\\'")}')"
+                        
+                        ${s}
+                    </div>
+                `).join('');
+                suggestionList.style.position = "absolute";
+                suggestionList.style.zIndex = "99";
+                suggestionList.style.width = searchInput.offsetWidth + "px";
+            });
+    });
+    searchInput.addEventListener('blur', function() {
+        setTimeout(()=>{suggestionList.innerHTML = "";}, 150);
+    });
+    </script>
 </body>
 </html>
