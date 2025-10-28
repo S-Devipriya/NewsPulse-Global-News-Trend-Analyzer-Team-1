@@ -101,6 +101,9 @@ def fetch_and_store():
     articles = fetch_live_news()
     store_articles(articles)
 
+if __name__ == "__main__":
+    fetch_and_store()
+
 
 # In[ ]:
 

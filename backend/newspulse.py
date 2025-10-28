@@ -21,7 +21,7 @@ load_dotenv()
 def fetch_from_db(search_query):
     fetch_news.fetch_and_store()
     keyword_extractor.extract_and_store_keywords()
-    topic_selection.analyze_topics()
+    topic_selection.assign_topic()
     try:
         connection = mysql.connect(
             host = os.getenv("MYSQL_HOST"),
