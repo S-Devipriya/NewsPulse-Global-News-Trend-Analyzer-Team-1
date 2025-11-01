@@ -9,7 +9,6 @@ import spacy
 from fetch_news import connect_db
 
 load_dotenv()
-# Download once, or check if exists
 try:
     stopwords.words('english')
 except LookupError:
@@ -18,6 +17,11 @@ except LookupError:
 stop_words = set(stopwords.words('english'))
 nlp = spacy.load("en_core_web_sm")
 
+def get_topic_keywords(topic_str, n=3):
+    # Extracts n top keywords from LDA topic descriptor string
+    # Example input: '0.025*"ai" + 0.020*"robot" + ...'
+    words = [w.split('*"')[1].replace('"', '') for w in topic_str.split(' + ')[:n]]
+    return ", ".join(words)
 
 def analyze_topics():
     conn = connect_db()
@@ -30,10 +34,9 @@ def analyze_topics():
         cursor.close()
         conn.close()
         return
-        
+
     raw_news = pd.DataFrame(rows, columns=['id', 'title', 'description', 'content'])
 
-    # Build a list of tokenized documents (list of lists)
     docs_tokens = []
     doc_ids = []
     for i, row in raw_news.iterrows():
@@ -42,13 +45,10 @@ def analyze_topics():
         description = row['description'] or ""
         content = row['content'] or ""
         text = (title + " " + description + " " + content).strip().lower()
-
-        # Preprocessing steps
         text = re.sub(r"http\S+|www\S+|https\S+", '', text, flags=re.MULTILINE)
         text = text.translate(str.maketrans('', '', string.punctuation))
         text = re.sub(r'\d+', '', text)
 
-        # Tokenize and lemmatize the current document
         doc = nlp(text)
         current_doc_tokens = []
         for token in doc:
@@ -56,16 +56,14 @@ def analyze_topics():
                 lemma = token.lemma_.strip()
                 if lemma and lemma != '-PRON-':
                     current_doc_tokens.append(lemma)
-        
         docs_tokens.append(current_doc_tokens)
 
-    # Create dictionary and corpus from all documents
     if not docs_tokens:
         print("No tokens found after preprocessing.")
         return
 
     dictionary = corpora.Dictionary(docs_tokens)
-    dictionary.filter_extremes(no_below=2, no_above=0.8) # Filter out rare and common words
+    dictionary.filter_extremes(no_below=2, no_above=0.8)
     corpus = [dictionary.doc2bow(doc) for doc in docs_tokens]
 
     # Train LDA model
@@ -77,28 +75,14 @@ def analyze_topics():
         for idx, topic in topics:
             print(f"Topic {idx}: {topic}")
 
-        # Assign topics to documents
-        manual_topic_labels = {
-            0: "Science & Technology",
-            1: "Business & Economy",
-            2: "World Politics & Governance",
-            3: "Health & Lifestyle",
-            4: "Sports & Entertainment"
-        }
         print("\nAssigning topics to articles...")
-        # Assign a topic to each document and update the database
         for i, doc_corpus in enumerate(corpus):
             doc_id = doc_ids[i]
-            # Get the most likely topic for the document
             topic_distribution = lda_model.get_document_topics(doc_corpus)
-            
             if topic_distribution:
-                # Find the topic ID with the highest probability
                 best_topic_id = max(topic_distribution, key=lambda item: item[1])[0]
-                # Get the human-readable label from your manual mapping
-                assigned_topic = manual_topic_labels.get(best_topic_id, "General")
-                
-                # Update the database
+                topic_keywords = get_topic_keywords(topics[best_topic_id][1], n=3)
+                assigned_topic = topic_keywords if topic_keywords else "General"
                 try:
                     cursor.execute("UPDATE news SET topic = %s WHERE id = %s", (assigned_topic, doc_id))
                     conn.commit()
@@ -107,7 +91,6 @@ def analyze_topics():
                     print(f"Error updating article {doc_id}: {e}")
             else:
                 print(f"  -> Could not determine topic for article {doc_id}")
-
 
     else:
         print("Not enough data to build a topic model.")
