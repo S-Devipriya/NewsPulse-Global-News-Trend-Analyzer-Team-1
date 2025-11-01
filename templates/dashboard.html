@@ -5,110 +5,61 @@
     <title>News Dashboard</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        body {
-            background-image: url('/static/images/background.png');
-            background-size: cover;
-            background-attachment: fixed;
-            background-position: center;
-        }
-        .navbar-custom {
-            background-color: rgb(151, 230, 237);
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
-        }
-        .navbar-custom .navbar-brand,
-        .navbar-custom .nav-link,
-        .navbar-custom .navbar-text {
-            color: #0b3c85;
-            font-weight: bold;
-        }
-        .navbar-icon {
-            width: 125px;
-            height: auto;
-            margin-right: 10px;
-        }
-        h2 {
-            margin: 0;
-            font-weight: bold;
-            font-size: 28px;
-            color: #0b3c85;
-        }
-        .card-custom {
-            background-color: rgb(151, 230, 237);
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0px 6px 20px rgba(0,0,0,0.2);
-        }
-        .btn {
-            color: #ffffff;
-            background-color: rgba(11, 60, 133);
-            margin: 10px;
-        }
-        .btn-custom {
-            color: rgb(255, 255, 255);
-            background-color: rgb(26, 92, 161);
-            border: none;
-        }
-        .btn-custom:hover {
-            color: white;
-            background-color: rgb(32, 117, 178);
-        }
-        .card-title {
-            color: #0b3c85;
-            font-weight: bold;
-        }
-        .sentiment-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.93em;
-            color: #fff;
-            margin-left: 4px;
-        }
+        body { background-image: url('/static/images/background.png'); background-size: cover; background-attachment: fixed; background-position: center; }
+        .navbar-custom { background-color: rgb(151, 230, 237); box-shadow: 0px 4px 15px rgba(0,0,0,0.1); }
+        .navbar-custom .navbar-brand, .navbar-custom .nav-link, .navbar-custom .navbar-text { color: #0b3c85; font-weight: bold; }
+        .navbar-icon { width: 125px; height: auto; margin-right: 10px; }
+        h2 { margin: 0; font-weight: bold; font-size: 28px; color: #0b3c85; }
+        .card-custom { background-color: rgb(151, 230, 237); border: none; border-radius: 12px; box-shadow: 0px 6px 20px rgba(0,0,0,0.2);}
+        .btn { color: #ffffff; background-color: rgba(11, 60, 133); margin: 10px; }
+        .btn-custom { color: rgb(255, 255, 255); background-color: rgb(26, 92, 161); border: none; }
+        .btn-custom:hover { color: white; background-color: rgb(32, 117, 178); }
+        .card-title { color: #0b3c85; font-weight: bold;}
+        .sentiment-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.93em; color: #fff; margin-left: 4px; }
         .sentiment-badge.positive { background: #25bf49; }
         .sentiment-badge.neutral { background: #b0bdcb }
         .sentiment-badge.negative { background: #960210; }
         .ner-label { font-size: 0.96em; color: #777; font-weight: 600; }
-        .ner-chip {
-            display: inline-block;
-            background: #ececec;
-            color: #222;
-            border-radius: 10px;
-            padding: 2px 7px;
-            margin: 1px 4px 1px 0;
-            font-size: 0.93em;
-            border: 1px solid #bcbcbc;
-        }
+        .ner-chip { display: inline-block; background: #ececec; color: #222; border-radius: 10px; padding: 2px 7px; margin: 1px 4px 1px 0; font-size: 0.93em; border: 1px solid #bcbcbc; }
         .ner-chip.person { background: #c3eaff; border-color: #53b0e7; }
         .ner-chip.org { background: #e0ffd4; border-color: #8fd37b; }
         .ner-chip.location { background: #fff5d7; border-color: #e8c467; }
-        .mic-btn {
-            background: #f0f4fb;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            padding: 4px;
-            margin-left: 4px;
+        .mic-btn { background: #f0f4fb; border: none; border-radius: 50%; cursor: pointer; padding: 4px; margin-left: 4px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        .mic-btn:hover { background: #d2e7ff; }
+        .mic-btn img { vertical-align: middle; width: 26px; height: 26px; }
+        .suggest-item { cursor: pointer; background: #fff; border: 1px solid #ccc; padding: 4px 10px;}
+        .suggest-item:hover {background: #e9f2ff;}
+        /* --- Summary Card --- */
+        .news-summary-container {
+            display: flex;
+            justify-content: left;
+            margin-bottom: 1.5em;
+        }
+        .news-summary-card {
+            background: rgba(151,230,237,0.88);
+            color: #181818;
+            font-size: 1.15em;
+            border-radius: 16px;
+            border: 2px solid #7bd3f7;
+            box-shadow: 0 4px 20px rgba(30,80,140,0.11);
+            padding: 18px 26px 18px 20px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            min-width: 350px;
+            max-width: 900px;
+        }
+        .news-summary-label {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .summary-text {
+            font-weight: 400;
+            margin-right: 20px;
             transition: background 0.2s;
         }
-        .mic-btn:hover {
-            background: #d2e7ff;
-        }
-        .mic-btn img {
-            vertical-align: middle;
-            width: 26px;
-            height: 26px;
-        }
-        /* --- AUTOCOMPLETE SUGGESTION DROPDOWN --- */
-        .suggest-item {
-            cursor: pointer;
-            background: #fff;
-            border: 1px solid #ccc;
-            padding: 4px 10px;
-        }
-        .suggest-item:hover {
-            background: #e9f2ff;
+        .news-summary-card button {
+            margin-left: 10px;
+            min-width: 55px;
         }
     </style>
 </head>
@@ -144,6 +95,18 @@
             </div>
         </div>
 
+        <!-- Highlighted Summary Card -->
+        {% if summary %}
+        <div class="news-summary-container">
+            <div class="news-summary-card">
+                <span class="news-summary-label">Summary:</span>
+                <span class="summary-text" id="read-summary">{{ summary }}</span>
+                <button onclick="speakSummary()" class="btn btn-outline-primary btn-sm">🔊 Speak</button>
+                <button onclick="stopSummary()" class="btn btn-outline-danger btn-sm">⏹ Stop</button>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Results Info -->
         {% if query and query|lower != 'latest' %}
             <div class="alert alert-info mt-3" style="background-color: rgba(151, 230, 237, 0.8); border:none; color: #0b3c85;">
@@ -174,7 +137,6 @@
                                 <strong>Topic:</strong> {{ article.topic }}
                             </p>
                             {% endif %}
-
                             <!-- Sentiment Analysis Display -->
                             {% if article.sentiment %}
                             <div class="my-2">
@@ -194,7 +156,6 @@
                                 <small class="text-muted">Positive: {{ article.sentiment.positive }}% | Neutral: {{ article.sentiment.neutral }}% | Negative: {{ article.sentiment.negative }}%</small>
                             </div>
                             {% endif %}
-
                             <!-- Named Entities Display -->
                             {% if article.entities %}
                             <div class="mt-2">
@@ -273,15 +234,12 @@
               micButton.disabled = false;
           };
       } else {
-          // Hide mic button if not supported
           micButton.style.display = "none";
       }
     </script>
-
     <!-- Autocomplete Suggestion Script -->
     <script>
     const suggestionList = document.getElementById('suggestion-list');
-    // Use a helper function for setting value
     function selectSuggestion(val) {
         document.getElementById('searchInput').value = val;
         suggestionList.innerHTML = '';
@@ -303,7 +261,6 @@
                 suggestionList.innerHTML = data.map(s => `
                     <div class="suggest-item"
                         onmousedown="selectSuggestion('${s.replace(/'/g, "\\'")}')"
-                        
                         >${s}
                     </div>
                 `).join('');
@@ -315,6 +272,23 @@
     searchInput.addEventListener('blur', function() {
         setTimeout(()=>{suggestionList.innerHTML = "";}, 150);
     });
+    </script>
+    <!-- Speak & STOP Summary Script -->
+    <script>
+    function speakSummary() {
+        var summaryElem = document.getElementById('read-summary');
+        if (!summaryElem) { return; }
+        var summary = summaryElem.textContent || summaryElem.innerText || "";
+        summary = summary.trim();
+        if (!summary) return;
+        var utter = new window.SpeechSynthesisUtterance(summary);
+        utter.lang = 'en-US';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+    }
+    function stopSummary() {
+        window.speechSynthesis.cancel();
+    }
     </script>
 </body>
 </html>
