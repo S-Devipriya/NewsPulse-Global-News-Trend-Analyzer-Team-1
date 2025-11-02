@@ -61,6 +61,13 @@
             margin-left: 10px;
             min-width: 55px;
         }
+        .trend-card {
+            border-left: 4px solid #007bff;
+            transition: transform 0.2s;
+        }
+        .trend-card:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
@@ -73,7 +80,8 @@
             </a>
             <div class="d-flex align-items-center">
                 <span class="navbar-text me-3">Welcome, {{ user }}</span>
-                <a href="/profile" class="btn btn-primary">Profile</a>
+                <a href="/trends" class="btn btn-primary me-2">Trends</a>
+                <a href="/profile" class="btn btn-primary me-2">Profile</a>
                 <a href="/logout" class="btn btn-primary">Logout</a>
             </div>
         </div>
@@ -94,6 +102,74 @@
                 <div id="suggestion-list" style="position:relative;"></div>
             </div>
         </div>
+
+        <!-- ========== TREND ANALYSIS SECTION ========== -->
+        <div class="row mb-4">
+            <!-- Trending Topics -->
+            <div class="col-md-4">
+                <div class="card card-custom h-100 trend-card">
+                    <div class="card-body">
+                        <h5 class="card-title">🔥 Trending Topics</h5>
+                        {% if trends_data.topics %}
+                            {% for topic, words in trends_data.topics.items() %}
+                                <div class="mb-2">
+                                    <strong>{{ topic }}:</strong>
+                                    <div>
+                                        {% for word in words[:3] %}
+                                            <span class="badge bg-primary mb-1">{{ word }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No trending topics yet</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Keywords -->
+            <div class="col-md-4">
+                <div class="card card-custom h-100 trend-card">
+                    <div class="card-body">
+                        <h5 class="card-title">🏷️ Top Keywords</h5>
+                        {% if trends_data.keywords %}
+                            {% for keyword, count in trends_data.keywords.items() %}
+                                <span class="badge bg-success mb-1">
+                                    {{ keyword }} <span class="badge bg-light text-dark">{{ count }}</span>
+                                </span>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No keywords yet</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trending Articles -->
+            <div class="col-md-4">
+                <div class="card card-custom h-100 trend-card">
+                    <div class="card-body">
+                        <h5 class="card-title">📈 Trending Now</h5>
+                        {% if trends_data.trending_articles %}
+                            {% for article in trends_data.trending_articles[:3] %}
+                                <div class="mb-2 pb-2 border-bottom">
+                                    <strong>{{ article.title[:60] }}{% if article.title|length > 60 %}...{% endif %}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        {{ article.source }} • 
+                                        {{ article.publishedAt.strftime('%H:%M') if article.publishedAt else 'Recent' }}
+                                    </small>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No trending articles</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ========== END TREND ANALYSIS SECTION ========== -->
 
         <!-- Highlighted Summary Card -->
         {% if summary %}
@@ -197,6 +273,36 @@
                 </div>
             {% endif %}
         </div>
+
+        <!-- ========== QUICK STATS SECTION ========== -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card card-custom">
+                    <div class="card-body text-center">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <h3 class="text-primary">{{ news|length }}</h3>
+                                <p class="mb-0">Total Articles</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="text-success">{{ trends_data.trending_articles|length }}</h3>
+                                <p class="mb-0">Trending</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="text-info">{{ trends_data.topics|length }}</h3>
+                                <p class="mb-0">Topics</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="text-warning">{{ trends_data.keywords|length }}</h3>
+                                <p class="mb-0">Keywords</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ========== END QUICK STATS SECTION ========== -->
+
     </div>
 
     <!-- Voice Recognition Script -->

@@ -17,11 +17,14 @@ from collections import Counter
 from sentiment import analyze_sentiment, save_sentiment
 from ner import extract_entities, save_entities
 
+# ADD THIS IMPORT for trend analysis
+from trend_detector import TrendDetector
+
 load_dotenv()
 
 def fetch_from_db(search_query):
     fetch_news.fetch_and_store()
-    keyword_extractor.extract_and_store_keywords()
+    #keyword_extractor.extract_and_store_keywords()
     topic_selection.analyze_topics()
     try:
         connection = mysql.connect(
@@ -206,6 +209,11 @@ def dashboard():
     query = request.values.get("query", "latest").strip()
     news_items = fetch_from_db(query)
     summary = generate_summary(news_items, user_query=query)
+    
+    # ADD TREND ANALYSIS TO DASHBOARD
+    detector = TrendDetector()
+    trends_data = detector.get_daily_trends()
+    
     enriched_news = []
     for article in news_items:
         text = f"{article.get('title', '')}. {article.get('description', '')}"
@@ -217,13 +225,112 @@ def dashboard():
         article['sentiment'] = sentiment
         article['entities'] = entities_dict
         enriched_news.append(article)
+    
     return render_template(
         "dashboard.html",
         news=enriched_news,
         user=g.username,
         query=query,
-        summary=summary
+        summary=summary,
+        trends_data=trends_data,
+        now=datetime.now()
     )
+
+# ========== TREND ANALYSIS ROUTES ==========
+
+@app.route("/trends")
+@token_required
+def trends():
+    """Main trends page showing trending topics and articles"""
+    detector = TrendDetector()
+    trends_data = detector.get_daily_trends()
+    
+    return render_template(
+        "trends.html",
+        trends_data=trends_data,
+        user=g.username,
+        now=datetime.now()
+    )
+
+@app.route("/trending-articles")
+@token_required
+def trending_articles():
+    """API endpoint to get trending articles"""
+    detector = TrendDetector()
+    trends_data = detector.get_daily_trends()
+    
+    return jsonify({
+        'trending_articles': trends_data['trending_articles'],
+        'top_keywords': trends_data['keywords']
+    })
+
+@app.route("/trending-topics")
+@token_required
+def trending_topics():
+    """API endpoint to get trending topics"""
+    detector = TrendDetector()
+    trends_data = detector.get_daily_trends()
+    
+    return jsonify({
+        'topics': trends_data['topics'],
+        'categories': trends_data['trend_categories']
+    })
+
+@app.route("/article/<int:article_id>")
+@token_required
+def article_detail(article_id):
+    """Detailed view of a single article"""
+    try:
+        connection = mysql.connect(
+            host=os.getenv("MYSQL_HOST"),
+            port=int(os.getenv("MYSQL_PORT")),
+            user=os.getenv("MYSQL_USER"),
+            password=os.getenv("MYSQL_PASSWORD"),
+            database=os.getenv("MYSQL_DB")
+        )
+        cursor = connection.cursor(dictionary=True)
+        
+        cursor.execute("""
+            SELECT n.*, s.sentiment_score, s.sentiment_label 
+            FROM news n
+            LEFT JOIN sentiment s ON n.id = s.article_id
+            WHERE n.id = %s
+        """, (article_id,))
+        
+        article = cursor.fetchone()
+        
+        # Get entities separately
+        cursor.execute("""
+            SELECT people, organizations, locations 
+            FROM entities 
+            WHERE article_id = %s
+        """, (article_id,))
+        
+        entities_result = cursor.fetchone()
+        connection.close()
+        
+        if not article:
+            flash("Article not found!", "danger")
+            return redirect("/trends")
+        
+        # Process entities
+        entities = {
+            'people': entities_result['people'].split(',') if entities_result and entities_result['people'] else [],
+            'organizations': entities_result['organizations'].split(',') if entities_result and entities_result['organizations'] else [],
+            'locations': entities_result['locations'].split(',') if entities_result and entities_result['locations'] else []
+        }
+        
+        return render_template(
+            "article_detail.html",
+            article=article,
+            entities=entities,
+            user=g.username
+        )
+        
+    except Exception as e:
+        print(f"Error fetching article: {e}")
+        flash("Error loading article!", "danger")
+        return redirect("/trends")
 
 @app.route("/analyze-sentiment", methods=["POST"])
 @token_required
