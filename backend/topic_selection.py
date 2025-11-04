@@ -131,7 +131,7 @@ def train_lda_model():
     
     print("\n--- ACTION REQUIRED ---")
     print("Manually update the 'manual_topic_labels' dictionary in the")
-    print("'assign_topics_to_new_articles' function with these topics.")
+    print("'assign_topic' function with these topics.")
     print("------------------------")
 
 
