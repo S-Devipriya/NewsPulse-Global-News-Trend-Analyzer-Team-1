@@ -53,7 +53,9 @@ def connect_db():
 def fetch_live_news(topic=None, num_articles=10):
     NEWS_API_KEY = os.getenv("NEWS_API_KEY")
     url = f"https://newsapi.org/v2/top-headlines?language=en&pageSize={int(num_articles)}&apiKey={NEWS_API_KEY}"
+    #url = f"https://newsapi.org/v2/top-headlines?language=en&topic=general&pageSize={int(num_articles)}&apiKey={NEWS_API_KEY}"
     #url = f"https://newsapi.org/v2/everything?q={topic}&pageSize={num_articles}&apiKey={NEWS_API_KEY}"
+    #url = f"https://newsapi.org/v2/everything?from=2025-10-07&to=2025-11-07&sortBy=popularity&apiKey={NEWS_API_KEY}"
     response = requests.get(url)
     data = response.json()
     articles = data.get("articles", [])
