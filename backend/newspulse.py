@@ -14,8 +14,8 @@ from datetime import datetime, timedelta
 from collections import Counter
 
 # Import sentiment and NER logic
-from sentiment import analyze_sentiment, save_sentiment
-from ner import extract_entities, save_entities
+from sentiment import analyze_and_save_sentiments
+from ner import analyze_and_save_entities
 
 # ADD THIS IMPORT for trend analysis
 from trend_detector import TrendDetector
@@ -26,6 +26,8 @@ def fetch_from_db(search_query):
     fetch_news.fetch_and_store()
     keyword_extractor.extract_and_store_keywords()
     topic_selection.assign_topic()
+    analyze_and_save_sentiments()
+    analyze_and_save_entities()
     try:
         connection = mysql.connect(
             host = os.getenv("MYSQL_HOST"),
@@ -40,28 +42,56 @@ def fetch_from_db(search_query):
         articles = []
         return articles
 
-    articles = []
+    sql_select_clause = """SELECT
+                            n.id, n.title, n.source, n.publishedAt, n.url, n.description, n.imageurl, n.keywords, n.topic,
+                            s.positive, s.neutral, s.negative, s.overall,
+                            e.people, e.organizations, e.locations
+                        FROM news n
+                        LEFT JOIN sentiments s ON n.id = s.article_id
+                        LEFT JOIN entities e ON n.id = e.article_id"""
+    articles_raw = []
     if search_query:
         cleaned_search_query = preprocess_text(search_query)
         if cleaned_search_query:
-            sql_query = """
-                SELECT id, title, source, publishedAt, url, description, imageurl, keywords, topic FROM news
+            # Add the WHERE clause for searching
+            sql_query = sql_select_clause + """
                 WHERE
-                    LOWER(title) LIKE %s OR
-                    LOWER(description) LIKE %s OR
-                    LOWER(keywords) LIKE %s OR
-                    LOWER(topic) LIKE %s
-                ORDER BY publishedAt DESC
+                    LOWER(n.title) LIKE %s OR
+                    LOWER(n.description) LIKE %s OR
+                    LOWER(n.keywords) LIKE %s OR
+                    LOWER(n.topic) LIKE %s
+                ORDER BY n.publishedAt DESC
             """
             query_param = f"%{cleaned_search_query.lower()}%"
             cursor.execute(sql_query, (query_param, query_param, query_param, query_param))
-            articles = cursor.fetchall()
+            articles_raw = cursor.fetchall()
         else:
-            articles = []
+            articles_raw = []
     else:
-        sql_query = "SELECT id, title, source, publishedAt, url, description, imageurl, keywords, topic FROM news ORDER BY publishedAt DESC"
+        sql_query = sql_select_clause + " ORDER BY n.publishedAt DESC"
         cursor.execute(sql_query)
-        articles = cursor.fetchall()
+        articles_raw = cursor.fetchall()
+
+    articles = []
+    for row in articles_raw:
+        row['sentiment'] = {
+            'positive': row.get('positive'),
+            'neutral': row.get('neutral'),
+            'negative': row.get('negative'),
+            'overall': row.get('overall')
+        } if row.get('overall') else None 
+
+        row['entities'] = {
+            'people': row['people'].split(',') if row.get('people') else [],
+            'organizations': row['organizations'].split(',') if row.get('organizations') else [],
+            'locations': row['locations'].split(',') if row.get('locations') else []
+        } if row.get('people') or row.get('organizations') or row.get('locations') else None
+
+        for key in ['positive', 'neutral', 'negative', 'overall', 'people', 'organizations', 'locations']:
+            if key in row:
+                del row[key]
+        
+        articles.append(row)
 
     connection.close()
     return articles
@@ -214,21 +244,9 @@ def dashboard():
     detector = TrendDetector()
     trends_data = detector.get_daily_trends()
     
-    enriched_news = []
-    for article in news_items:
-        text = f"{article.get('title', '')}. {article.get('description', '')}"
-        article_id = article['id']
-        sentiment = analyze_sentiment(text)
-        save_sentiment(article_id, sentiment)
-        entities_dict = extract_entities(text)
-        save_entities(article_id, entities_dict['entities'])
-        article['sentiment'] = sentiment
-        article['entities'] = entities_dict
-        enriched_news.append(article)
-    
     return render_template(
         "dashboard.html",
-        news=enriched_news,
+        news=news_items,
         user=g.username,
         query=query,
         summary=summary,
@@ -331,28 +349,6 @@ def article_detail(article_id):
         print(f"Error fetching article: {e}")
         flash("Error loading article!", "danger")
         return redirect("/trends")
-
-@app.route("/analyze-sentiment", methods=["POST"])
-@token_required
-def sentiment_api():
-    data = request.get_json()
-    text = data.get('text', '')
-    article_id = data.get('article_id')
-    sentiment = analyze_sentiment(text)
-    if article_id:
-        save_sentiment(article_id, sentiment)
-    return jsonify(sentiment)
-
-@app.route("/extract-entities", methods=["POST"])
-@token_required
-def ner_api():
-    data = request.get_json()
-    text = data.get('text', '')
-    article_id = data.get('article_id')
-    entities_dict = extract_entities(text)
-    if article_id:
-        save_entities(article_id, entities_dict['entities'])
-    return jsonify(entities_dict)
 
 @app.route('/api/suggest')
 def suggest():
