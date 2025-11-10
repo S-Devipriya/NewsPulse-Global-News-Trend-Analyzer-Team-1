@@ -7,7 +7,6 @@ import string
 from sklearn.feature_extraction.text import CountVectorizer
 from sentence_transformers import SentenceTransformer
 from bertopic import BERTopic
-import joblib
 from fetch_news import connect_db
 import os
 
@@ -19,6 +18,20 @@ BERTOPIC_MODEL_PATH = os.path.join(MODEL_DIR, "BERTopic_model")
 
 # Ensure the 'models' directory exists
 os.makedirs(MODEL_DIR, exist_ok=True)
+
+# Manually update this map after you run training and see the
+# "Topics Detected" output in your terminal.
+# Topic -1 is the outlier topic in BERTopic.
+manual_topic_labels = {
+        -1: "Miscellaneous",
+        0: "Politics",
+        1: "Health",
+        2: "Science",
+        3: "Sports",
+        4: "Technology",
+        5: "Entertainment",
+        6: "Business"
+}
 
 def get_stopwords():
     """
@@ -53,6 +66,48 @@ def preprocess_text_for_bert(text):
     text = " ".join(text.split()) 
     return text
 
+def create_and_sync_topic_tables():
+    conn = connect_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS topics (
+            id INT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            keywords TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE(name)
+        );
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS article_topics_mapping (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            article_id INT NOT NULL,
+            topic_id INT NOT NULL,
+            relevance_score FLOAT,
+            assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (article_id) REFERENCES news(id),
+            FOREIGN KEY (topic_id) REFERENCES topics(id),
+            UNIQUE KEY (article_id, topic_id)
+        );
+    """)
+    
+    print("Syncing manual labels to 'topics' table...")
+    for topic_id, name in manual_topic_labels.items():
+        try:
+            cursor.execute("""
+                INSERT INTO topics (id, name, created_at, updated_at)
+                VALUES (%s, %s, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE name = %s, updated_at = NOW();""", (topic_id, name, name))
+        except Exception as e:
+            print(f"Error syncing topic {topic_id} ('{name}'): {e}")
+            
+    conn.commit()
+    conn.close()
+    print("Topic tables are ready and synced.")
+
 def train_models():
     """
     Fetches ALL articles, trains a new BERTopic model,
@@ -61,6 +116,7 @@ def train_models():
     """
     print("Starting BERTopic Model Training....")
     
+    create_and_sync_topic_tables()
     conn = connect_db()
     cursor = conn.cursor()
 
@@ -94,7 +150,7 @@ def train_models():
         vectorizer_model=vectorizer_model,
         language="english",
         verbose=True,
-        min_topic_size=10
+        min_topic_size=13
     )
 
     print("Training BERTopic model (this may take a while)...")
@@ -110,29 +166,32 @@ def train_models():
     print("\nTraining Complete!")
     
     print("\n🔍 Topics Detected:")
-    print(topic_model.get_topic_info())
-    
-    print("\n--- ACTION REQUIRED ---")
-    print("Manually update the 'manual_topic_labels' dictionary in the")
-    print("'assign_topic' function with these topics.")
-    print("------------------------")
+    topic_info = topic_model.get_topic_info()
+    print(topic_info)
 
+    print("Updating 'topics' table with new keywords...")
+    conn = connect_db()
+    cursor = conn.cursor()
+    for row in topic_info.to_dict('records'):
+        topic_id = int(row['Topic'])
+        keywords_str = ", ".join(row['Representation'])
+        cursor.execute("""
+            UPDATE topics SET keywords = %s, updated_at = NOW()
+            WHERE id = %s""", (keywords_str, topic_id))
+    conn.commit()
+    conn.close()
+    print("Topic keywords updated.")
+    
+    print("\nACTION REQUIRED")
+    print("Review the topic list above.")
+    print("If topic names (0, 1, 2, etc.) don't match your `manual_topic_labels` dict,")
+    print("please update the dictionary in this script.")
 
 def assign_topic():
     # LOADS the saved models and assigns topics to new article
-    # Manually update this map after you run training and see the
-    # "Topics Detected" output in your terminal.
-    # Topic -1 is the outlier topic in BERTopic.
-    manual_topic_labels = {
-        -1: "General", 
-        0: "Sports",
-        1: "Health",
-        2: "Technology",
-        3: "Science",
-        4: "Business",
-        # Add more mappings as found by the model
-    }
     
+    create_and_sync_topic_tables()
+
     try:
         # Load the saved BERTopic model
         topic_model = BERTopic.load(BERTOPIC_MODEL_PATH)
@@ -147,7 +206,14 @@ def assign_topic():
     conn = connect_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, title, description, content FROM news WHERE topic IS NULL OR topic = ''")
+    print("Finding new articles to assign topics to...")
+    # Find articles that are NOT in the article_topics mapping table yet
+    cursor.execute("""
+        SELECT n.id, n.title, n.description, n.content 
+        FROM news n
+        LEFT JOIN article_topics_mapping at ON n.id = at.article_id
+        WHERE at.article_id IS NULL;
+    """)
     rows = cursor.fetchall()
     
     if not rows:
@@ -158,7 +224,6 @@ def assign_topic():
     
     print(f"Assigning topics to {len(rows)} new articles...")
 
-    # --- Batch Processing ---
     texts_to_assign = []
     doc_ids = []
     for row in rows:
@@ -178,10 +243,12 @@ def assign_topic():
         return
 
     try:
-        # Use .transform() to assign topics to new docs
-        # This returns a list of topic IDs, one for each doc
-        topic_ids, _ = topic_model.transform(texts_to_assign)
-    
+        # Get both the predicted topic ID and the probability matrix
+        topic_ids, probabilities = topic_model.transform(texts_to_assign)
+        
+        # Get the relevance score (the probability of the *assigned* topic)
+        relevance_scores = list(probabilities)
+        
     except Exception as e:
         print(f"Error transforming new articles: {e}")
         cursor.close()
@@ -192,17 +259,20 @@ def assign_topic():
     updates = 0
     for i in range(len(doc_ids)):
         doc_id = doc_ids[i]
-        best_topic_id = topic_ids[i] # Get the topic ID for this doc
-        assigned_topic = manual_topic_labels.get(int(best_topic_id), "General")
+        topic_id = int(topic_ids[i])
+        score = float(relevance_scores[i])
         
         try:
-            cursor.execute("UPDATE news SET topic = %s WHERE id = %s", (assigned_topic, doc_id))
+            cursor.execute("""
+                INSERT INTO article_topics_mapping (article_id, topic_id, relevance_score, assigned_at)
+                VALUES (%s, %s, %s, NOW())""", (doc_id, topic_id, score))
             updates += 1
         except Exception as e:
-            print(f"Error updating article {doc_id}: {e}")
+            if "Duplicate entry" not in str(e):
+                print(f"Error updating article {doc_id}: {e}")
     
     conn.commit()
-    print(f"Topic assignment complete. {updates} articles updated.")
+    print(f"Topic assignment complete. {updates} articles mapped.")
     cursor.close()
     conn.close()
 

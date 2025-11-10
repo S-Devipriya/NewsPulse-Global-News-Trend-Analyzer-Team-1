@@ -1,16 +1,33 @@
 import os
 from dotenv import load_dotenv
 import pandas as pd
+import mysql.connector
 from keybert import KeyBERT
 from fetch_news import connect_db
 
 load_dotenv()
 
+def create_keywords_table():
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS keywords(
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    article_id INT UNIQUE,
+                    keywords TEXT,
+                    FOREIGN KEY(article_id) REFERENCES news(id)
+                );''')
+    conn.close()
+    return
+
 def extract_and_store_keywords():
+    create_keywords_table()
     conn = connect_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, title, description FROM news WHERE keywords IS NULL OR keywords = ''")
+    cursor.execute('''SELECT n.id, n.title, n.description
+                      FROM news n
+                      LEFT JOIN keywords k ON n.id = k.article_id
+                      WHERE k.article_id IS NULL;''')
     rows = cursor.fetchall()
     raw_news = pd.DataFrame(rows, columns=['id', 'title', 'description'])
 
@@ -29,8 +46,11 @@ def extract_and_store_keywords():
     # Store keywords back to the database
     for news_id, keywords in keywords_dict.items():
         keywords_str = ', '.join(keywords)
-        cursor.execute("UPDATE news SET keywords = %s WHERE id = %s", (keywords_str, news_id))
+        cursor.execute("INSERT INTO keywords (keywords, article_id) VALUES(%s, %s)", (keywords_str, news_id))
         conn.commit()
 
     cursor.close()
     conn.close()
+
+if __name__ == "__main__":
+    extract_and_store_keywords()

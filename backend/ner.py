@@ -22,61 +22,47 @@ def connect_db():
     create_table_query = '''CREATE TABLE IF NOT EXISTS entities (
                id INT AUTO_INCREMENT PRIMARY KEY,
                article_id INT,
-               people TEXT,
-               organizations TEXT,
-               locations TEXT,
+               name VARCHAR(255),
+               type VARCHAR(100),
+               confidence FLOAT,
                FOREIGN KEY (article_id) REFERENCES news(id),
-               UNIQUE KEY (article_id)
+               INDEX(article_id)
            );'''
     cursor.execute(create_table_query)
     conn.commit()
     return conn
 
 def extract_entities(text):
-    """
-    Extract named entities from text.
-    Returns:
-        dict: {
-            'organizations': [str, ...],
-            'people': [str, ...],
-            'locations': [str, ...]
-        }
-    """
+    #Extract named entities from text.
     doc = nlp(text)
-    organizations = list(set([ent.text for ent in doc.ents if ent.label_ == 'ORG']))
-    people = list(set([ent.text for ent in doc.ents if ent.label_ == 'PERSON']))
-    locations = list(set([ent.text for ent in doc.ents if ent.label_ in ['GPE', 'LOC']]))
+    allowed_labels = {'PERSON', 'ORG', 'GPE', 'LOC'}
+    unique_ents = list(set([(ent.text, ent.label_) for ent in doc.ents if ent.label_ in allowed_labels]))
+    return [{'text': text, 'label': label} for text, label in unique_ents]
 
-    return {
-        'organizations': organizations,
-        'people': people,
-        'locations': locations
-    }
-
-def save_entities(article_id, entities_dict):
+def save_entities(article_id, entities_list):
     """
     Store entity results for a news article in the database.
-
     entities_list: [{'text': ..., 'label': ..., 'confidence': ...}, ...]
     If confidence not present, defaults to 1.0.
     """
     conn = connect_db()
     cursor = conn.cursor()
-    
-    people_str = ",".join(entities_dict['people'])
-    orgs_str = ",".join(entities_dict['organizations'])
-    locs_str = ",".join(entities_dict['locations'])
 
-    query = '''INSERT INTO entities (article_id, people, organizations, locations)
-               VALUES (%s, %s, %s, %s)'''
-    try:
-        cursor.execute(query, (
+    query = '''INSERT INTO entities (article_id, name, type, confidence) VALUES (%s, %s, %s, %s)'''
+    
+    rows_to_insert = []
+    for ent in entities_list:
+        rows_to_insert.append((
             article_id,
-            people_str,
-            orgs_str,
-            locs_str
+            ent['text'],
+            ent['label'],
+            float(ent.get('confidence', 1.0))
         ))
-        conn.commit()
+
+    try:
+        if rows_to_insert:
+            cursor.executemany(query, rows_to_insert)
+            conn.commit()
     except Exception as e:
         print(f"Error saving entities for article {article_id}: {e}")
     finally:
@@ -91,12 +77,12 @@ def analyze_and_save_entities():
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute('''
-        SELECT n.id, n.title, n.description
+        SELECT n.id, n.title, n.description, n.content
         FROM news n
         LEFT JOIN entities e ON n.id = e.article_id
         WHERE e.article_id IS NULL;
     ''')
-    
+
     articles_to_process = cursor.fetchall()
     
     if not articles_to_process:
@@ -117,9 +103,8 @@ def analyze_and_save_entities():
             
         print(f"Extracting entities for article {article_id}...")
         
-        entities_dict = extract_entities(text)
-        
-        save_entities(article_id, entities_dict)
+        entities_list = extract_entities(text)
+        save_entities(article_id, entities_list)
         
     conn.close()
     print("NER batch processing complete.")

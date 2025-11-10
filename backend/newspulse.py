@@ -43,25 +43,26 @@ def fetch_from_db(search_query):
         return articles
 
     sql_select_clause = """SELECT
-                            n.id, n.title, n.source, n.publishedAt, n.url, n.description, n.imageurl, n.keywords, n.topic,
+                            n.id, n.title, n.source, n.publishedAt, n.url, n.description, n.imageurl,
+                            k.keywords,
                             s.positive, s.neutral, s.negative, s.overall,
-                            e.people, e.organizations, e.locations
+                            t.name AS topic_name
                         FROM news n
+                        LEFT JOIN keywords k ON n.id = k.article_id
                         LEFT JOIN sentiments s ON n.id = s.article_id
-                        LEFT JOIN entities e ON n.id = e.article_id"""
+                        LEFT JOIN article_topics_mapping atm ON n.id = atm.article_id
+                        LEFT JOIN topics t ON atm.topic_id = t.id"""
     articles_raw = []
     if search_query:
         cleaned_search_query = preprocess_text(search_query)
         if cleaned_search_query:
             # Add the WHERE clause for searching
-            sql_query = sql_select_clause + """
-                WHERE
-                    LOWER(n.title) LIKE %s OR
-                    LOWER(n.description) LIKE %s OR
-                    LOWER(n.keywords) LIKE %s OR
-                    LOWER(n.topic) LIKE %s
-                ORDER BY n.publishedAt DESC
-            """
+            sql_query = sql_select_clause + """ WHERE
+                                                LOWER(n.title) LIKE %s OR
+                                                LOWER(n.description) LIKE %s OR
+                                                LOWER(k.keywords) LIKE %s OR
+                                                LOWER(t.name) LIKE %s
+                                            ORDER BY n.publishedAt DESC"""
             query_param = f"%{cleaned_search_query.lower()}%"
             cursor.execute(sql_query, (query_param, query_param, query_param, query_param))
             articles_raw = cursor.fetchall()
@@ -72,29 +73,61 @@ def fetch_from_db(search_query):
         cursor.execute(sql_query)
         articles_raw = cursor.fetchall()
 
-    articles = []
+    if not articles_raw:
+        connection.close()
+        return []
+    
+    articles_dict = {}
+    article_ids = []
     for row in articles_raw:
+        # Nested sentiment dict
         row['sentiment'] = {
             'positive': row.get('positive'),
             'neutral': row.get('neutral'),
             'negative': row.get('negative'),
             'overall': row.get('overall')
-        } if row.get('overall') else None 
-
+        } if row.get('overall') else None
+        
+        # Placeholder for entities
         row['entities'] = {
-            'people': row['people'].split(',') if row.get('people') else [],
-            'organizations': row['organizations'].split(',') if row.get('organizations') else [],
-            'locations': row['locations'].split(',') if row.get('locations') else []
-        } if row.get('people') or row.get('organizations') or row.get('locations') else None
-
-        for key in ['positive', 'neutral', 'negative', 'overall', 'people', 'organizations', 'locations']:
+            'people': [],
+            'organizations': [],
+            'locations': []
+        }
+        
+        # Renaming 'topic_name' to 'topic' for the template
+        row['topic'] = row.get('topic_name')
+        
+        # Cleaning up flat keys
+        for key in ['positive', 'neutral', 'negative', 'overall', 'topic_name']:
             if key in row:
                 del row[key]
         
-        articles.append(row)
+        articles_dict[row['id']] = row
+        article_ids.append(row['id'])
+
+    ids_placeholder = ','.join(['%s'] * len(article_ids))
+    entity_query = f"""SELECT article_id, name, type 
+                    FROM entities 
+                    WHERE article_id IN ({ids_placeholder})"""
+    cursor.execute(entity_query, tuple(article_ids))
+    entities_raw = cursor.fetchall()
+
+    for entity in entities_raw:
+        article_id = entity['article_id']
+        if article_id in articles_dict:
+            ent_type = entity['type']
+            ent_name = entity['name']
+            if ent_type == 'PERSON':
+                articles_dict[article_id]['entities']['people'].append(ent_name)
+            elif ent_type == 'ORG':
+                articles_dict[article_id]['entities']['organizations'].append(ent_name)
+            elif ent_type in ['GPE', 'LOC']:
+                articles_dict[article_id]['entities']['locations'].append(ent_name)
 
     connection.close()
-    return articles
+    
+    return list(articles_dict.values())
 
 def generate_summary(articles, user_query=None, max_keywords=3, max_entities=3):
     keyword_list = []
@@ -308,35 +341,46 @@ def article_detail(article_id):
         )
         cursor = connection.cursor(dictionary=True)
         
-        cursor.execute("""
-            SELECT n.*, s.sentiment_score, s.sentiment_label 
-            FROM news n
-            LEFT JOIN sentiment s ON n.id = s.article_id
-            WHERE n.id = %s
-        """, (article_id,))
+        cursor.execute("""SELECT 
+                            n.*, 
+                            k.keywords,
+                            s.positive, s.neutral, s.negative, s.overall,
+                            t.name as topic_name
+                        FROM news n
+                        LEFT JOIN keywords k ON n.id = k.article_id
+                        LEFT JOIN sentiments s ON n.id = s.article_id
+                        LEFT JOIN article_topics_mapping atm ON n.id = atm.article_id
+                        LEFT JOIN topics t ON atm.topic_id = t.id
+                        WHERE n.id = %s""", (article_id,))
         
         article = cursor.fetchone()
         
-        # Get entities separately
-        cursor.execute("""
-            SELECT people, organizations, locations 
-            FROM entities 
-            WHERE article_id = %s
-        """, (article_id,))
+        if not article:
+            connection.close()
+            flash("Article not found!", "danger")
+            return redirect("/dashboard")
+
+        article['sentiment'] = {
+            'positive': article.get('positive'),
+            'neutral': article.get('neutral'),
+            'negative': article.get('negative'),
+            'overall': article.get('overall')
+        } if article.get('overall') else None
+        article['topic'] = article.get('topic_name')
         
-        entities_result = cursor.fetchone()
+        cursor.execute("""SELECT name, type FROM entities WHERE article_id = %s""", (article_id,))
+        
+        entities_raw = cursor.fetchall()
         connection.close()
         
-        if not article:
-            flash("Article not found!", "danger")
-            return redirect("/trends")
-        
-        # Process entities
-        entities = {
-            'people': entities_result['people'].split(',') if entities_result and entities_result['people'] else [],
-            'organizations': entities_result['organizations'].split(',') if entities_result and entities_result['organizations'] else [],
-            'locations': entities_result['locations'].split(',') if entities_result and entities_result['locations'] else []
-        }
+        entities = {'people': [], 'organizations': [], 'locations': []}
+        for ent in entities_raw:
+            if ent['type'] == 'PERSON':
+                entities['people'].append(ent['name'])
+            elif ent['type'] == 'ORG':
+                entities['organizations'].append(ent['name'])
+            elif ent['type'] in ['GPE', 'LOC']:
+                entities['locations'].append(ent['name'])
         
         return render_template(
             "article_detail.html",
@@ -364,17 +408,15 @@ def suggest():
             database = os.getenv("MYSQL_DB")
         )
         cursor = connection.cursor()
-        cursor.execute("""
-            SELECT DISTINCT topic FROM news
-            WHERE LOWER(topic) LIKE %s AND topic IS NOT NULL
-            LIMIT 5
-        """, (f"%{query}%",))
+        
+        cursor.execute("""SELECT DISTINCT name FROM topics
+                            WHERE LOWER(name) LIKE %s AND name IS NOT NULL
+                            LIMIT 5""", (f"%{query}%",))
         topics = [row[0] for row in cursor.fetchall() if row[0]]
-        cursor.execute("""
-            SELECT DISTINCT keywords FROM news
-            WHERE LOWER(keywords) LIKE %s AND keywords IS NOT NULL
-            LIMIT 10
-        """, (f"%{query}%",))
+        
+        cursor.execute("""SELECT DISTINCT keywords FROM keywords
+                            WHERE LOWER(keywords) LIKE %s AND keywords IS NOT NULL
+                            LIMIT 10""", (f"%{query}%",))
         keywords = []
         for row in cursor.fetchall():
             for word in row[0].split(","):

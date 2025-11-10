@@ -45,8 +45,11 @@ class TrendDetector:
         cursor = self.connection.cursor(dictionary=True)
         
         query = """
-            SELECT id, title, description, publishedAt, keywords, topic, source, url, imageurl
-            FROM news 
+            SELECT n.id, n.title, n.description, n.publishedAt, n.source, n.url, n.imageurl, k.keywords, t.name
+            FROM news n
+            LEFT JOIN keywords k ON n.id = k.article_id
+            LEFT JOIN article_topics_mapping atm ON n.id = atm.article_id
+            LEFT JOIN topics t ON atm.topic_id = t.id
             WHERE publishedAt >= DATE_SUB(NOW(), INTERVAL %s DAY)
             ORDER BY publishedAt DESC
         """
