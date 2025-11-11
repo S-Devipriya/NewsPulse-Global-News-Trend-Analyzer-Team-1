@@ -25,6 +25,13 @@
             height: auto; 
             margin-right: 10px; 
         }
+        .nav-link.admin-link {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .nav-link.admin-link:hover, .nav-link:hover {
+            background-color: rgb(163, 236, 243);
+        }
         h2 { 
             margin: 0; 
             font-weight: bold; 
@@ -52,7 +59,7 @@
             background-color: rgb(32, 117, 178); 
         }
         .card-title { 
-            color: #0b3c85; 
+            color: #0b3c85;
             font-weight: bold;
         }
         .sentiment-badge { 
@@ -148,7 +155,7 @@
         }
         .news-summary-label {
             font-weight: bold;
-            margin-right: 8px;
+            margin-right: 20px;
         }
         .summary-text {
             font-weight: 400;
@@ -160,8 +167,15 @@
             min-width: 55px;
         }
         .trend-card {
-            border-left: 4px solid #007bff;
-            transition: transform 0.2s;
+            background-color: rgb(151, 230, 237); 
+            border: none; 
+            border-radius: 12px;
+            box-shadow: 0px 6px 20px rgba(0,0,0,0.2);
+        }
+        .trend-card .card-header {
+            font-weight: bold;
+            background-color: #0b3c85;
+            color: aliceblue;
         }
         .trend-card:hover {
             transform: translateY(-2px);
@@ -181,6 +195,11 @@
                 <a href="/trends" class="nav-link"><i class="fas fa-fire"></i> Trends</a>
                 <a href="/profile" class="nav-link"><i class="fas fa-cog"></i> Profile</a>
                 <a href="/logout" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                {% if user_role == 'admin' %}
+                    <a href="/admin/dashboard" class="nav-link admin-link">
+                        <i class="fas fa-shield-alt"></i> Admin Panel
+                    </a>
+                {% endif %}
             </div>
         </div>
     </nav>
@@ -205,9 +224,9 @@
         <div class="row mb-4">
             <!-- Trending Topics -->
             <div class="col-md-4">
-                <div class="card card-custom h-100 trend-card">
+                <div class="card trend-card">
+                    <h5 class="card-header"> Trending Topics</h5>
                     <div class="card-body">
-                        <h5 class="card-title">🔥 Trending Topics</h5>
                         {% if trends_data.topics %}
                             {% for topic, words in trends_data.topics.items() %}
                                 <div class="mb-2">
@@ -228,9 +247,9 @@
 
             <!-- Top Keywords -->
             <div class="col-md-4">
-                <div class="card card-custom h-100 trend-card">
+                <div class="card trend-card">
+                    <h5 class="card-header"> Top Keywords</h5>
                     <div class="card-body">
-                        <h5 class="card-title">🏷️ Top Keywords</h5>
                         {% if trends_data.keywords %}
                             {% for keyword, count in trends_data.keywords.items() %}
                                 <span class="badge bg-success mb-1">
@@ -246,9 +265,9 @@
 
             <!-- Trending Articles -->
             <div class="col-md-4">
-                <div class="card card-custom h-100 trend-card">
+                <div class="card trend-card">
+                    <h5 class="card-header"> Trending Now</h5>
                     <div class="card-body">
-                        <h5 class="card-title">📈 Trending Now</h5>
                         {% if trends_data.trending_articles %}
                             {% for article in trends_data.trending_articles[:3] %}
                                 <div class="mb-2 pb-2 border-bottom">
@@ -273,10 +292,10 @@
         {% if summary %}
         <div class="news-summary-container">
             <div class="news-summary-card">
-                <span class="news-summary-label">Summary:</span>
+                <span class="news-summary-label">  Summary  </span>
                 <span class="summary-text" id="read-summary">{{ summary }}</span>
-                <button onclick="speakSummary()" class="btn btn-outline-primary btn-sm">🔊 Speak</button>
-                <button onclick="stopSummary()" class="btn btn-outline-danger btn-sm">⏹ Stop</button>
+                <button onclick="speakSummary()" class="btn btn-primary btn-sm">🔊 Speak</button>
+                <button onclick="stopSummary()" class="btn btn-primary btn-sm">⏹ Stop</button>
             </div>
         </div>
         {% endif %}
@@ -315,7 +334,7 @@
                             {% if article.sentiment %}
                             <div class="my-2">
                                 <strong>Sentiment:</strong>
-                                <span class="sentiment-badge 
+                                <span class="sentiment-badge">
                                     {% if article.sentiment.overall == "Positive" %}positive
                                     {% elif article.sentiment.overall == "Negative" %}negative
                                     {% else %}neutral
