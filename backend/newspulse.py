@@ -20,6 +20,8 @@ from ner import analyze_and_save_entities
 # ADD THIS IMPORT for trend analysis
 from trend_detector import TrendDetector
 
+app_start_time = datetime.now()
+
 load_dotenv()
 
 def fetch_from_db(search_query):
@@ -199,12 +201,24 @@ def token_required(f):
             data = jwt.decode(token, secret_key, algorithms=['HS256'])
             g.user_id = data['sub']
             g.username = data['username']
+            g.role = data.get('role', 'user')
         except jwt.ExpiredSignatureError:
             flash('Your session has expired. Please log in again.', 'danger')
             return redirect('/login')
         except Exception as e:
+            print({e})
             flash('Authentication token is invalid!', 'danger')
             return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    @token_required  # First, ensure user is logged in
+    def decorated(*args, **kwargs):
+        if g.role != 'admin':
+            flash('You do not have permission to access this page.', 'danger')
+            return redirect('/dashboard')
         return f(*args, **kwargs)
     return decorated
 
@@ -227,9 +241,19 @@ def login():
         email = request.form["email"]
         password = request.form["password"]
         secret_key = os.getenv("FLASK_SECRET_KEY")
-        token = users.login_user(email, password, secret_key)
-        if token:
+        user_data = users.login_user(email, password)
+        if user_data:
+            token_payload = {
+                'exp': datetime.utcnow() + timedelta(days=1),
+                'iat': datetime.utcnow(),
+                'sub': str(user_data['id']),
+                'username': user_data.get('username', user_data['email']),
+                'role': user_data.get('role', 'user')
+            }
+            token = jwt.encode(token_payload, secret_key, algorithm='HS256')
+            
             response = make_response(redirect('/dashboard'))
+                
             response.set_cookie('token', token, httponly=True, samesite='Lax')
             return response
         else:
@@ -252,7 +276,8 @@ def profile():
                 'exp': datetime.utcnow() + timedelta(days=1),
                 'iat': datetime.utcnow(),
                 'sub': str(g.user_id),
-                'username': username
+                'username': username,
+                'role': g.role
             }
             new_token = jwt.encode(new_payload, secret_key, algorithm='HS256')
             response = make_response(redirect("/profile"))
@@ -264,7 +289,7 @@ def profile():
             flash("Profile updated, but session could not be refreshed. Please log in again.", "warning")
             return redirect("/login")
     user = user_profile.get_user_profile(user_id)
-    return render_template("profile.html", user=user)
+    return render_template("profile.html", user=user, user_role=g.role)
 
 @app.route("/dashboard", methods=["GET", "POST"])
 @token_required
@@ -281,10 +306,68 @@ def dashboard():
         "dashboard.html",
         news=news_items,
         user=g.username,
+        user_role=g.role,
         query=query,
         summary=summary,
         trends_data=trends_data,
         now=datetime.now()
+    )
+
+@app.route("/admin/dashboard")
+@admin_required 
+def admin_dashboard():
+    stats = {
+        'avg_response': '128ms',
+        'user_count': 0,
+        'article_count': 0,
+        'keyword_count': 0,
+        'topic_count': 0,
+        'system_uptime': 'N/A'
+    }
+    
+    try:
+        uptime_delta = datetime.now() - app_start_time
+        stats['system_uptime'] = str(uptime_delta).split('.')[0]
+        
+        connection = mysql.connect(
+            host = os.getenv("MYSQL_HOST"),
+            port = int(os.getenv("MYSQL_PORT")),
+            user = os.getenv("MYSQL_USER"),
+            password = os.getenv("MYSQL_PASSWORD"),
+            database = os.getenv("MYSQL_DB")
+        )
+        cursor = connection.cursor()
+        
+        # Get Regular Users
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'user'")
+        stats['user_count'] = cursor.fetchone()[0]
+        
+        # Get Article Count
+        cursor.execute("SELECT COUNT(*) FROM news")
+        stats['article_count'] = cursor.fetchone()[0]
+
+        # Get Keyword Count
+        cursor.execute("SELECT COUNT(*) FROM keywords")
+        stats['keyword_count'] = cursor.fetchone()[0]
+
+        # Get Topic Count
+        cursor.execute("SELECT COUNT(*) FROM topics")
+        stats['topic_count'] = cursor.fetchone()[0]
+        
+        connection.close()
+
+    except mysql.Error as err:
+        print(f"Error connecting to DB for admin stats: {err}")
+        flash("Could not load all database statistics.", "warning")
+    except Exception as e:
+        print(f"Error in admin dashboard: {e}")
+        flash("An error occurred loading admin data.", "danger")
+
+    return render_template(
+        "admin_dashboard.html",
+        user=g.username,
+        user_role=g.role,
+        stats=stats
     )
 
 # ========== TREND ANALYSIS ROUTES ==========
@@ -300,6 +383,7 @@ def trends():
         "trends.html",
         trends_data=trends_data,
         user=g.username,
+        user_role=g.role,
         now=datetime.now()
     )
 
@@ -386,7 +470,8 @@ def article_detail(article_id):
             "article_detail.html",
             article=article,
             entities=entities,
-            user=g.username
+            user=g.username,
+            user_role=g.role
         )
         
     except Exception as e:

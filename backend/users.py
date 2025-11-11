@@ -21,6 +21,7 @@ def connect_db():
         id INT AUTO_INCREMENT PRIMARY KEY,
         email VARCHAR(255) UNIQUE,
         password LONGTEXT,
+        role TEXT,
         createdAt DATETIME,
         updatedAt DATETIME);''')
     conn.commit()
@@ -42,7 +43,7 @@ def register_user(email, password):
     now = datetime.now()
     
     try:
-        cursor.execute("INSERT INTO users (email, password, createdAt) VALUES (%s, %s, %s)", (email, hashed_password, now))
+        cursor.execute("INSERT INTO users (email, password, role, createdAt) VALUES (%s, %s, %s, %s)", (email, hashed_password, 'user', now))
         conn.commit()
         user_profile.update_user_profile(cursor.lastrowid, "", "", "")
     except mysql.connector.Error as err:
@@ -53,35 +54,23 @@ def register_user(email, password):
         conn.close()
     return True # Registration successful
 
-def login_user(email, password, secret_key):
+def login_user(email, password):
     conn = connect_db()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
     user = cursor.fetchone()
-    cursor.close
+    cursor.close()
     conn.close()
 
     if user and check_password_hash(user['password'], password):
-        try:
-            conn = user_profile.connect_db()
-            cursor = conn.cursor()
-            cursor.execute("SELECT username FROM user_preferences WHERE user_id = %s", (user['id'],))
-            username = cursor.fetchone()
-            payload = {
-                'exp': datetime.utcnow() + timedelta(days=1),
-                'iat': datetime.utcnow(),
-                'sub': str(user['id']),
-                'username': username[0] if username else ""
-            }
-            token = jwt.encode(
-                payload,
-                secret_key,
-                algorithm='HS256'
-            )
-            cursor.close()
-            conn.close()
-            return token
-        except Exception as e:
-            print(f"Error encoding JWT: {e}")
-            return None
+        conn = user_profile.connect_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM user_preferences WHERE user_id = %s", (user['id'],))
+        username = cursor.fetchone()
+        return {
+        'id': user['id'],
+        'email': user['email'],
+        'role': user['role'],
+        'username': username[0] if username else ""
+        }
     return None
