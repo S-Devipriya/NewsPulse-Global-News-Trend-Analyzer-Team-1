@@ -66,7 +66,7 @@
             padding: 2px 8px; 
             border-radius: 12px; 
             font-size: 0.93em; 
-            color: #fff; 
+            color: #0a0000; 
             margin-left: 4px; 
         }
         .sentiment-badge.positive { 
@@ -335,11 +335,7 @@
                             <div class="my-2">
                                 <strong>Sentiment:</strong>
                                 <span class="sentiment-badge">
-                                    {% if article.sentiment.overall == "Positive" %}positive
-                                    {% elif article.sentiment.overall == "Negative" %}negative
-                                    {% else %}neutral
-                                    {% endif %}">
-                                    {{ article.sentiment.overall }}
+                                    {{article.sentiment.overall}}
                                 </span>
                                 <div class="progress mt-2" style="height: 12px;">
                                     <div class="progress-bar bg-success" role="progressbar" style="width: {{ article.sentiment.positive }}%;" title="Positive"></div>
