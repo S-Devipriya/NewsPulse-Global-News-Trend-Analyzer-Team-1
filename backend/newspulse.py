@@ -13,6 +13,19 @@ import jwt
 from datetime import datetime, timedelta
 from collections import Counter
 
+from analytics_utils import (
+    get_existing_topics,
+    get_news_volume_timeseries_and_forecast,
+    get_sentiment_percentage_forecast,
+    get_topic_timeseries_and_forecast,
+    get_top_topics_from_db,
+    get_sentiment_distribution_numerical,
+    get_sentiment_numerical_trend_by_day,
+    get_sentiment_stats_from_db,
+    get_sentiment_trend_by_day,
+    get_top_topics_from_db
+)
+
 # Import sentiment and NER logic
 from sentiment import analyze_and_save_sentiments
 from ner import analyze_and_save_entities
@@ -411,6 +424,62 @@ def trending_topics():
         'categories': trends_data['trend_categories']
     })
 
+# ========== ANALYTICS ROUTES =========
+@app.route("/api/top_topics")
+@token_required
+def api_top_topics():
+    days = int(request.args.get("days", 7))
+    result = get_top_topics_from_db(days=days)
+    labels = [t['label'] for t in result]
+    counts = [t['count'] for t in result]
+    return jsonify({
+        "labels": labels,
+        "counts": counts,
+        "topic_list": result
+    })
+
+@app.route("/analytics", methods=["GET", "POST"])
+@token_required
+def analytics():
+
+    topic_list = get_existing_topics()  # [{'id':..., 'name':...}, ...]
+    
+    # Determine selected_topic_id from form or default to the first topic's id (if available)
+    if request.method == "POST":
+        selected_topic_id = request.form.get('selected_topic')
+        if selected_topic_id is not None:
+            selected_topic_id = int(selected_topic_id)
+    else:
+        selected_topic_id = topic_list[0]['id'] if topic_list else None
+
+    # Get the topic name for display, matched by id (safe default: empty string)
+    selected_topic_name = ""
+    if selected_topic_id is not None:
+        selected_topic_name = next((t['name'] for t in topic_list if t['id'] == selected_topic_id), "")
+
+    topic_result = get_topic_timeseries_and_forecast(selected_topic_id, days=90, predict_days=7) if selected_topic_id is not None else None
+
+    top_topics = get_top_topics_from_db()  # [{'label': 'Tech', 'count': 20}, ...]
+    sentiment_distribution = get_sentiment_distribution_numerical()
+    trend_over_time = get_sentiment_numerical_trend_by_day(days=90)
+    vol_result = get_news_volume_timeseries_and_forecast(days=90, predict_days=7)
+    sent_result = get_sentiment_percentage_forecast(days=90, predict_days=7)
+
+    return render_template(
+        "analytics.html",
+        topic_list=topic_list,
+        selected_topic_id=selected_topic_id,
+        selected_topic_name=selected_topic_name,
+        topic_result=topic_result,
+        top_topics=top_topics,
+        sentiment_distribution=sentiment_distribution,
+        trend_over_time=trend_over_time,
+        vol_result=vol_result,
+        sent_result=sent_result,
+    )
+
+      
+
 @app.route("/article/<int:article_id>")
 @token_required
 def article_detail(article_id):
@@ -514,6 +583,7 @@ def suggest():
     except mysql.Error as err:
         print(f"Database error in suggestions: {err}")
         return jsonify([])
+
 
 @app.route("/logout")
 def logout():
