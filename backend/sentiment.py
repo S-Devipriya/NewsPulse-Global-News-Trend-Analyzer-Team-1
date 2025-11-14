@@ -41,24 +41,45 @@ def analyze_sentiment(text):
             'overall': 'Positive' or 'Neutral' or 'Negative'
         }
     """
+    
     result = sentiment_analyzer(text)
-    label = result[0]['label']
+    label = result[0]['label'].upper()
     score = result[0]['score']
+    
+    # Default to zero for all scores
+    positive, neutral, negative = 0, 0, 0
 
+    # Assign scores based on returned label
     if label == 'POSITIVE':
-        return {
-            'positive': int(round(score * 100)),
-            'neutral': int(round((1-score) * 100)),
-            'negative': 0,
-            'overall': 'Positive'
-        }
+        positive = score
+        # If you want to distribute remainder, use below 
+        neutral = (1-score)
+        negative = 0
+        overall = 'Positive'
+    elif label == 'NEGATIVE':
+        negative = score
+        neutral = (1-score)
+        positive = 0
+        overall = 'Negative'
+    elif label == 'NEUTRAL':
+        neutral = score
+        # For remainder distribution
+        positive = 0
+        negative = 0
+        overall = 'Neutral'
     else:
-        return {
-            'positive': 0,
-            'neutral': int(round((1-score) * 100)),
-            'negative': int(round(score * 100)),
-            'overall': 'Negative'
-        }
+        # In case of unknown label, fallback to neutral
+        neutral = score
+        positive = 0
+        negative = 0
+        overall = 'Neutral'
+
+    return {
+        'positive': int(round(positive * 100)),
+        'neutral': int(round(neutral * 100)),
+        'negative': int(round(negative * 100)),
+        'overall': overall
+    }
 
 def save_sentiment(article_id, sentiment_dict):
     """
@@ -110,5 +131,3 @@ def analyze_and_save_sentiments():
 
 if __name__ == "__main__":
     analyze_and_save_sentiments()
-
-

@@ -13,6 +13,19 @@ import jwt
 from datetime import datetime, timedelta
 from collections import Counter
 
+from analytics_utils import (
+    get_existing_topics,
+    get_news_volume_timeseries_and_forecast,
+    get_sentiment_percentage_forecast,
+    get_topic_timeseries_and_forecast,
+    get_top_topics_from_db,
+    get_sentiment_distribution_numerical,
+    get_sentiment_numerical_trend_by_day,
+    get_sentiment_stats_from_db,
+    get_sentiment_trend_by_day,
+    get_top_topics_from_db
+)
+
 # Import sentiment and NER logic
 from sentiment import analyze_sentiment, save_sentiment
 from ner import extract_entities, save_entities
@@ -279,6 +292,62 @@ def trending_topics():
         'categories': trends_data['trend_categories']
     })
 
+# ========== ANALYTICS ROUTES =========
+@app.route("/api/top_topics")
+@token_required
+def api_top_topics():
+    days = int(request.args.get("days", 7))
+    result = get_top_topics_from_db(days=days)
+    labels = [t['label'] for t in result]
+    counts = [t['count'] for t in result]
+    return jsonify({
+        "labels": labels,
+        "counts": counts,
+        "topic_list": result
+    })
+
+@app.route("/analytics", methods=["GET", "POST"])
+@token_required
+def analytics():
+
+    topic_list = get_existing_topics()  # [{'id':..., 'name':...}, ...]
+    
+    # Determine selected_topic_id from form or default to the first topic's id (if available)
+    if request.method == "POST":
+        selected_topic_id = request.form.get('selected_topic')
+        if selected_topic_id is not None:
+            selected_topic_id = int(selected_topic_id)
+    else:
+        selected_topic_id = topic_list[0]['id'] if topic_list else None
+
+    # Get the topic name for display, matched by id (safe default: empty string)
+    selected_topic_name = ""
+    if selected_topic_id is not None:
+        selected_topic_name = next((t['name'] for t in topic_list if t['id'] == selected_topic_id), "")
+
+    topic_result = get_topic_timeseries_and_forecast(selected_topic_id, days=90, predict_days=7) if selected_topic_id is not None else None
+
+    top_topics = get_top_topics_from_db()  # [{'label': 'Tech', 'count': 20}, ...]
+    sentiment_distribution = get_sentiment_distribution_numerical()
+    trend_over_time = get_sentiment_numerical_trend_by_day(days=90)
+    vol_result = get_news_volume_timeseries_and_forecast(days=90, predict_days=7)
+    sent_result = get_sentiment_percentage_forecast(days=90, predict_days=7)
+
+    return render_template(
+        "analytics.html",
+        topic_list=topic_list,
+        selected_topic_id=selected_topic_id,
+        selected_topic_name=selected_topic_name,
+        topic_result=topic_result,
+        top_topics=top_topics,
+        sentiment_distribution=sentiment_distribution,
+        trend_over_time=trend_over_time,
+        vol_result=vol_result,
+        sent_result=sent_result,
+    )
+
+      
+
 @app.route("/article/<int:article_id>")
 @token_required
 def article_detail(article_id):
@@ -396,251 +465,6 @@ def suggest():
         print(f"Database error in suggestions: {err}")
         return jsonify([])
 
-# ========== ADMIN: Check if user is admin ==========
-def is_admin(user_id):
-    """Check if user has admin privileges"""
-    conn = mysql.connect(
-        host=os.getenv("MYSQL_HOST"),
-        port=int(os.getenv("MYSQL_PORT")),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DB")
-    )
-    cursor = conn.cursor()
-    
-    try:
-        # Check if role column exists
-        cursor.execute("""
-            SELECT COUNT(*) FROM information_schema.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'users' 
-            AND COLUMN_NAME = 'role'
-        """)
-        role_column_exists = cursor.fetchone()[0] > 0
-        
-        if role_column_exists:
-            cursor.execute("SELECT role FROM users WHERE id = %s", (user_id,))
-            result = cursor.fetchone()
-            is_admin_user = result and result[0] == 'admin'
-        else:
-            # If role column doesn't exist, no one is admin yet
-            is_admin_user = False
-            
-    except Exception as e:
-        print(f"Error checking admin status: {e}")
-        is_admin_user = False
-    finally:
-        cursor.close()
-        conn.close()
-    
-    return is_admin_user
-
-# ========== ADMIN: Enhanced Admin Dashboard Route ==========
-@app.route("/admin")
-@token_required
-def admin_dashboard():
-    # Check if user is admin
-    if not is_admin(g.user_id):
-        flash("Access denied. Admin privileges required.", "danger")
-        return redirect('/dashboard')
-    
-    # Get admin statistics
-    conn = mysql.connect(
-        host=os.getenv("MYSQL_HOST"),
-        port=int(os.getenv("MYSQL_PORT")),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DB")
-    )
-    cursor = conn.cursor(dictionary=True)
-    
-    # Get user statistics
-    cursor.execute("SELECT COUNT(*) as total FROM users")
-    total_users = cursor.fetchone()['total']
-    
-    cursor.execute("SELECT COUNT(*) as admins FROM users WHERE role = 'admin'")
-    admin_users = cursor.fetchone()['admins']
-    
-    regular_users = total_users - admin_users
-    
-    # Get other statistics
-    cursor.execute("SELECT COUNT(*) as articles FROM news")
-    article_count = cursor.fetchone()['articles']
-    
-    cursor.execute("SELECT COUNT(*) as keywords FROM keywords")
-    keyword_count = cursor.fetchone()['keywords']
-    
-    cursor.execute("SELECT COUNT(*) as topics FROM topics")
-    topic_count = cursor.fetchone()['topics']
-    
-    # Get system uptime (simplified - you can enhance this)
-    cursor.execute("SELECT MIN(createdAt) as start_time FROM users")
-    start_time = cursor.fetchone()['start_time']
-    if start_time:
-        uptime = datetime.now() - start_time
-        hours, remainder = divmod(uptime.total_seconds(), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        system_uptime = f"{int(hours)}:{int(minutes):02d}:{int(seconds):02d}"
-    else:
-        system_uptime = "0:00:00"
-    
-    # Get all users for the table with usernames
-    cursor.execute("""
-        SELECT u.id, u.email, u.role, u.createdAt, up.username 
-        FROM users u 
-        LEFT JOIN user_preferences up ON u.id = up.user_id 
-        ORDER BY u.createdAt DESC
-    """)
-    all_users = cursor.fetchall()
-    
-    conn.close()
-    
-    return render_template(
-        "admin_dashboard.html",
-        total_users=total_users,
-        admin_users=admin_users,
-        regular_users=regular_users,
-        article_count=article_count,
-        keyword_count=keyword_count,
-        topic_count=topic_count,
-        system_uptime=system_uptime,
-        avg_response=128,  # You can calculate this dynamically later
-        users=all_users,
-        username=g.username,
-        current_user_id=g.user_id,
-        role=g.role
-    )
-
-# ========== ADMIN: Delete User Route ==========
-@app.route("/admin/delete_user/<int:user_id>", methods=["POST"])
-@token_required
-def delete_user(user_id):
-    # Check if user is admin
-    if not is_admin(g.user_id):
-        flash("Access denied. Admin privileges required.", "danger")
-        return redirect('/dashboard')
-    
-    # Prevent admin from deleting themselves
-    if user_id == g.user_id:
-        flash("You cannot delete your own account.", "danger")
-        return redirect('/admin')
-    
-    conn = mysql.connect(
-        host=os.getenv("MYSQL_HOST"),
-        port=int(os.getenv("MYSQL_PORT")),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DB")
-    )
-    cursor = conn.cursor()
-    
-    try:
-        # First delete user preferences
-        cursor.execute("DELETE FROM user_preferences WHERE user_id = %s", (user_id,))
-        # Then delete the user
-        cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
-        conn.commit()
-        flash("User deleted successfully.", "success")
-    except Exception as e:
-        flash(f"Error deleting user: {e}", "danger")
-    finally:
-        cursor.close()
-        conn.close()
-    
-    return redirect('/admin')
-
-# ========== TEMPORARY: Make current user admin ==========
-@app.route("/make_me_admin")
-@token_required
-def make_me_admin():
-    """Temporary route to make current user admin"""
-    conn = mysql.connect(
-        host=os.getenv("MYSQL_HOST"),
-        port=int(os.getenv("MYSQL_PORT")),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DB")
-    )
-    cursor = conn.cursor()
-    
-    try:
-        # First, ensure role column exists
-        cursor.execute("""
-            SELECT COUNT(*) FROM information_schema.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'users' 
-            AND COLUMN_NAME = 'role'
-        """)
-        role_exists = cursor.fetchone()[0] > 0
-        
-        if not role_exists:
-            cursor.execute("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user'")
-            conn.commit()
-            print("Added role column to users table")
-        
-        # Make current user admin
-        cursor.execute("UPDATE users SET role = 'admin' WHERE id = %s", (g.user_id,))
-        conn.commit()
-        
-        # Get user email to confirm
-        cursor.execute("SELECT email, role FROM users WHERE id = %s", (g.user_id,))
-        user = cursor.fetchone()
-        
-        flash(f"Success! {user[0]} is now an admin. Role: {user[1]}", "success")
-        
-    except Exception as e:
-        flash(f"Error: {e}", "danger")
-    finally:
-        cursor.close()
-        conn.close()
-    
-    return redirect('/admin')
-
-# ========== DEBUG: Check user status ==========
-@app.route("/debug_user")
-@token_required
-def debug_user():
-    """Debug route to check user status"""
-    conn = mysql.connect(
-        host=os.getenv("MYSQL_HOST"),
-        port=int(os.getenv("MYSQL_PORT")),
-        user=os.getenv("MYSQL_USER"),
-        password=os.getenv("MYSQL_PASSWORD"),
-        database=os.getenv("MYSQL_DB")
-    )
-    cursor = conn.cursor(dictionary=True)
-    
-    # Check current user
-    cursor.execute("SELECT id, email, role FROM users WHERE id = %s", (g.user_id,))
-    current_user = cursor.fetchone()
-    
-    # Check all users
-    cursor.execute("SELECT id, email, role FROM users")
-    all_users = cursor.fetchall()
-    
-    # Check if role column exists
-    cursor.execute("""
-        SELECT COUNT(*) as exists_flag FROM information_schema.COLUMNS 
-        WHERE TABLE_SCHEMA = DATABASE() 
-        AND TABLE_NAME = 'users' 
-        AND COLUMN_NAME = 'role'
-    """)
-    role_column_exists = cursor.fetchone()['exists_flag'] > 0
-    
-    conn.close()
-    
-    return f"""
-    <h1>Debug Info</h1>
-    <h3>Current User:</h3>
-    <pre>{current_user}</pre>
-    <h3>All Users:</h3>
-    <pre>{all_users}</pre>
-    <h3>Role Column Exists: {role_column_exists}</h3>
-    <h3>Is Admin: {is_admin(g.user_id)}</h3>
-    <br>
-    <a href="/make_me_admin">Make Me Admin</a> | 
-    <a href="/admin">Try Admin Again</a>
-    """
 
 @app.route("/logout")
 def logout():

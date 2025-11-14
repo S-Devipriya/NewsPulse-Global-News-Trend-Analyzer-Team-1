@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NewsPulse: Global News Trend Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:700,900|Roboto:400,500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background-image: url('/static/images/background.png');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            font-family: 'Roboto', Arial, sans-serif;
+            color: #212322;
+        }
+        .analytics-header {
+            width: 100%;
+            background: #a7e4f5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0 10px 0;
+            border-radius: 0 0 30px 30px;
+            min-height: 80px;
+        }
+        .logo-title {
+            display: flex; align-items: center; gap: 18px; margin-left: 50px;
+        }
+        .header-logo {
+            height: 70px; width: auto;
+            margin-right: 15px;
+        }
+        .header-title {
+            color: #184397;
+            font-family: 'Montserrat', Arial, sans-serif;
+            font-weight: 700;
+            font-size: 2em;
+            letter-spacing: 0.8px;
+            vertical-align: middle;
+        }
+        .header-nav-bar {
+            display: flex; align-items: center; gap: 35px; margin-right: 70px;
+        }
+        .nav-link-btn {
+            color: #184397; font-weight: 700; font-size: 1.11em; text-decoration: none;
+            border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 7px;
+            transition: color 0.12s;
+        }
+        .nav-link-btn:hover { color: #400080; }
+        @media (max-width: 1100px) {
+            .header-title { font-size: 2em;}
+            .header-logo { height: 48px;}
+            .logo-title { margin-left: 8px;}
+            .header-nav-bar { margin-right: 10px; gap: 18px;}
+        }
+        @media (max-width: 800px) {
+            .analytics-header { flex-direction: column; align-items: flex-start; padding-bottom: 18px;}
+            .header-title { font-size: 1.3em;}
+            .header-logo { height: 32px;}
+            .header-nav-bar { margin-right: 0; gap: 13px; margin-top: 7px;}
+        }
+        .container {
+            max-width: 1150px;
+            margin: 24px auto 34px auto;
+            padding: 30px 34px 40px 34px;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(60,84,105,0.13);
+        }
+        .top-bar {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            margin: 0 0 32px 0;
+        }
+        .time-range-group {
+            display: flex;
+            gap: 13px;
+            align-items: center;
+            font-weight: 600;
+            color: #0d4e65;
+        }
+        .time-range-btn {
+            background: #16c1d3;
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            padding: 7px 21px;
+            font-weight: 700;
+            font-size: 1.07em;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        .time-range-btn.active, .time-range-btn:hover { background: #0d4e65; }
+        .flex-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 28px;
+            margin-bottom: 0;
+        }
+        .lightblue-card, .card, .wide-card {
+            background: #eaf6fd !important;
+            border-radius: 14px;
+            box-shadow: 0 2px 8px rgba(50,60,120,0.09);
+            padding: 28px 30px 26px 30px;
+            margin-bottom: 24px;
+            box-sizing: border-box;
+            overflow-x: auto;
+        }
+        .card { flex: 1 1 370px; min-width: 320px; max-width: 520px;}
+        .wide-card { width: 100%; min-width: 0; }
+        .section-title { font-size: 1.17rem; font-weight: 700; margin-bottom: 12px; margin-top: 2px; color: #174ea6; letter-spacing: 0.3px;}
+        .chart-container { height: 320px; max-width: 490px; margin: auto; padding-left: 32px;}
+        #topicsBar { max-width: 430px !important; }
+        #sentimentPie { max-width: 350px !important; max-height: 350px !important;}
+        .chart-container canvas { max-width: 100%; height: 340px !important; }
+        #topicsList { margin-top: 18px; }
+        @media (max-width: 900px) {
+            .container { padding: 9px; }
+            .flex-row { flex-direction: column; }
+            .card { min-width: unset; max-width: unset;}
+        }
+        .flex-row > * { min-width: 0; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div class="analytics-header">
+        <div class="logo-title">
+            <img src="/static/images/icon.png" alt="NewsPulse Logo" class="header-logo">
+            <span class="header-title">NewsPulse AI:Trend Analysis</span>
+        </div>
+        <div class="header-nav-bar">
+            <span class="nav-link-btn"><i class="fa-solid fa-user"></i> ca_as</span>
+            <a href="/trends" class="nav-link-btn"><i class="fa-solid fa-burn"></i> Trends</a>
+            <a href="/dashboard" class="nav-link-btn"><i class="fas fa-home"></i> Dashboard</a>
+            <a href="/profile" class="nav-link-btn"><i class="fa-solid fa-gear"></i> Profile</a>
+            <a href="/logout" class="nav-link-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="top-bar">
+            <div class="time-range-group">
+                <span>Time range:</span>
+                <button class="time-range-btn active" onclick="setTimeRange(7)" id="btn7">7 days</button>
+                <button class="time-range-btn" onclick="setTimeRange(30)" id="btn30">30 days</button>
+                <button class="time-range-btn" onclick="setTimeRange(90)" id="btn90">90 days</button>
+            </div>
+        </div>
+        <div class="flex-row">
+            <div class="lightblue-card card">
+                <div class="section-title">Top Topic</div>
+                <div class="chart-container"><canvas id="topicsBar"></canvas></div>
+                <div id="topicsList">
+                    {% for topic in top_topics %}
+                        <div style="margin:2px 0; color:#1683aa;"><b>{{ topic.label }}</b>: {{ topic.count }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="lightblue-card card">
+                <div class="section-title">Sentiment Distribution</div>
+                <div class="chart-container">
+                    <canvas id="sentimentPie"></canvas>
+                </div>
+                <div style="margin-top:8px;">
+                    <span style="color:#3db45e;">Positive ({{ sentiment_distribution.positive }}%)</span>,
+                    <span style="color:#ffcc00;">Neutral ({{ sentiment_distribution.neutral }}%)</span>,
+                    <span style="color:#ee5555;">Negative ({{ sentiment_distribution.negative }}%)</span>
+                </div>
+            </div>
+        </div>
+        <div class="lightblue-card wide-card">
+            <div class="section-title">Sentiment Over Time</div>
+            <div style="width:100%; height:400px;">
+                <canvas id="sentimentLine"></canvas>
+            </div>
+        </div>
+        <div class="lightblue-card wide-card">
+            <div class="section-title">Predicted News Volumes (Next 7 Days)</div>
+            <div style="width:100%; height:400px;">
+                <canvas id="volumeForecastLine"></canvas>
+            </div>
+        </div>
+        <div class="lightblue-card wide-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 16px 0 0;">
+                <div class="section-title">
+                    Topic Prediction: {{ selected_topic_name  }} (Next 7 Days)
+                </div>
+                <form method="POST" style="margin-bottom: 0;">
+                    <label for="topic-select" style="font-weight:600; color:#0d4e65;">Select Topic:</label>
+                    <select id="topic-select" name="selected_topic" style="padding:6px 16px; border-radius:6px; margin:0 8px;">
+                        {% for t in topic_list %}
+                            <option value="{{ t.id }}" {% if t.id == selected_topic_id %}selected{% endif %}>{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="time-range-btn" style="padding:6px 18px;">Show</button>
+                </form>
+            </div>
+            <div style="width:100%; height:400px;">
+                <canvas id="topicForecastLine"></canvas>
+            </div>
+        </div>
+        <div class="lightblue-card wide-card">
+            <div class="section-title">Predicted Sentiment Breakdown (Next 7 Days)</div>
+            <div style="width:100%; height:400px;">
+                <canvas id="sentimentForecastLine"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- FULL CHART SCRIPT WITH PREDICTION LOGIC -->
+    
+    
+    <script>
+    // ---- Data from Backend (initial load) ----
+    const topicsData = {
+        labels: [{% for topic in top_topics %}'{{ topic.label }}',{% endfor %}],
+        counts: [{% for topic in top_topics %}{{ topic.count }},{% endfor %}]
+    };
+    const sentimentData = {
+        labels: ['Positive', 'Neutral', 'Negative'],
+        values: [
+            {{ sentiment_distribution.positive }},
+            {{ sentiment_distribution.neutral }},
+            {{ sentiment_distribution.negative }}
+        ]
+    };
+    const trendLabels = [{% for day in trend_over_time.days %}'{{ day }}',{% endfor %}];
+    const trendData = {
+        positive: [{% for p in trend_over_time.positive %}{{ p }},{% endfor %}],
+        neutral:  [{% for n in trend_over_time.neutral %}{{ n }},{% endfor %}],
+        negative: [{% for g in trend_over_time.negative %}{{ g }},{% endfor %}],
+    };
+    // Prediction - news volume
+    const volHistoryDates = [{% for d in vol_result.history_dates %}'{{ d }}',{% endfor %}];
+    const volHistoryCounts = [{% for c in vol_result.history_counts %}{{ c }},{% endfor %}];
+    const volFcastDates = [{% for d in vol_result.fcast_dates %}'{{ d }}',{% endfor %}];
+    const volFcastValues = [{% for v in vol_result.fcast_values %}{{ v }},{% endfor %}];
+    // Prediction - sentiment
+    const sentDays = [{% for d in sent_result.days %}'{{ d }}',{% endfor %}];
+    const posHist = [{% for v in sent_result.pos %}{{ v }},{% endfor %}];
+    const neuHist = [{% for v in sent_result.neu %}{{ v }},{% endfor %}];
+    const negHist = [{% for v in sent_result.neg %}{{ v }},{% endfor %}];
+    const sentFcastDates = [{% for d in sent_result.pos_fcast_dates %}'{{ d }}',{% endfor %}];
+    const posFcast = [{% for v in sent_result.pos_fcast %}{{ v }},{% endfor %}];
+    const neuFcast = [{% for v in sent_result.neu_fcast %}{{ v }},{% endfor %}];
+    const negFcast = [{% for v in sent_result.neg_fcast %}{{ v }},{% endfor %}];
+    // Prediction - topic
+    const topicHistDates = [{% for d in topic_result.history_dates %}'{{ d }}',{% endfor %}];
+    const topicHistCounts = [{% for c in topic_result.history_counts %}{{ c }},{% endfor %}];
+    const topicFcastDates = [{% for d in topic_result.fcast_dates %}'{{ d }}',{% endfor %}];
+    const topicFcastValues = [{% for v in topic_result.fcast_values %}{{ v }},{% endfor %}];
+
+    // ---- Charts (created only ONCE!) ----
+    const topicsBarChart = new Chart(document.getElementById('topicsBar').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: topicsData.labels,
+            datasets: [{
+                label: 'Articles',
+                data: topicsData.counts,
+                backgroundColor: [
+                    '#16c1d3', '#40b47b', '#ffd56b', '#fa7070', '#8e44ad'
+                ],
+                borderRadius: 10,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            layout: { padding: { left: 28, right: 0, top: 0, bottom: 0 } },
+            scales: {
+                x: { grid: { display: false }, beginAtZero: true },
+                y: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 16, weight: 'bold' },
+                        padding: 12,
+                        autoSkip: false,
+                        color: '#26738f'
+                    }
+                }
+            }
+        }
+    });
+
+    const sentimentPieChart = new Chart(document.getElementById('sentimentPie').getContext('2d'), {
+        type: 'pie',
+        data: {
+            labels: sentimentData.labels,
+            datasets: [{
+                data: sentimentData.values,
+                backgroundColor: [
+                    '#3db45e', '#ffd56b', '#ee5555'
+                ]
+            }]
+        },
+        options: {
+            plugins: { legend: { display: true, position: 'bottom' } }
+        }
+    });
+
+    let currentRange = 7;
+    const trendChart = new Chart(document.getElementById('sentimentLine').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: trendLabels.slice(-currentRange),
+            datasets: [
+                { label: 'Positive', data: trendData.positive.slice(-currentRange), borderColor: '#3db45e', fill: false, tension: 0.3 },
+                { label: 'Neutral', data: trendData.neutral.slice(-currentRange), borderColor: '#ffd56b', fill: false, tension: 0.3 },
+                { label: 'Negative', data: trendData.negative.slice(-currentRange), borderColor: '#ee5555', fill: false, tension: 0.3 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'bottom' } },
+            scales: { y: { min: 0, max: 100, grid: { display: false }, title: { display: true, text: '% of Articles' } }, x: { grid: { display: false }} }
+        }
+    });
+
+    // ---- Forecast Charts ----
+    let volumeForecastChart;
+    function drawVolumeForecastChart(days) {
+        const history_dates = volHistoryDates.slice(-days);
+        const history_counts = volHistoryCounts.slice(-days);
+        let combinedDates = [...history_dates, ...volFcastDates];
+        let ctx = document.getElementById('volumeForecastLine').getContext('2d');
+        if (volumeForecastChart) volumeForecastChart.destroy();
+        volumeForecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: combinedDates,
+                datasets: [
+                    {
+                        label: 'Historical Volume',
+                        data: [...history_counts, null, ...Array(volFcastValues.length).fill(null)],
+                        borderColor: '#16c1d3', backgroundColor: 'rgba(22,193,211,0.10)', fill: false, spanGaps: true
+                    },
+                    {
+                        label: 'Predicted Volume',
+                        data: [...Array(history_counts.length).fill(null), history_counts.length > 0 ? history_counts.slice(-1)[0] : null, ...volFcastValues],
+                        borderColor: '#fa7070', backgroundColor: 'rgba(250,112,112,0.11)', borderDash: [6,4], fill: false, spanGaps: true
+                    }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { display: true, position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false }}} }
+        });
+    }
+
+    let sentimentForecastChart;
+    function drawSentimentForecastChart(days) {
+        const h_days = sentDays.slice(-days);
+        const pos_h = posHist.slice(-days), neu_h = neuHist.slice(-days), neg_h = negHist.slice(-days);
+        const all_dates = [...h_days, ...sentFcastDates];
+        function withForecastLine(histArr, fArr) { return [...histArr, null, ...Array(fArr.length).fill(null)]; }
+        function dashedForecastOnly(histArr, fArr) { return [...Array(histArr.length).fill(null), histArr.length ? histArr.slice(-1)[0] : null, ...fArr]; }
+        const ctx = document.getElementById('sentimentForecastLine').getContext('2d');
+        if (sentimentForecastChart) sentimentForecastChart.destroy();
+        sentimentForecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: all_dates,
+                datasets: [
+                    { label: 'Positive (Past)', data: withForecastLine(pos_h, posFcast), borderColor: '#3db45e', fill: false, spanGaps: true },
+                    { label: 'Neutral (Past)', data: withForecastLine(neu_h, neuFcast), borderColor: '#ffd56b', fill: false, spanGaps: true },
+                    { label: 'Negative (Past)', data: withForecastLine(neg_h, negFcast), borderColor: '#ee5555', fill: false, spanGaps: true },
+                    { label: 'Positive (Forecast)', data: dashedForecastOnly(pos_h, posFcast), borderColor: '#3db45e', borderDash: [6,4], fill: false, spanGaps: true },
+                    { label: 'Neutral (Forecast)', data: dashedForecastOnly(neu_h, neuFcast), borderColor: '#ffd56b', borderDash: [6,4], fill: false, spanGaps: true },
+                    { label: 'Negative (Forecast)', data: dashedForecastOnly(neg_h, negFcast), borderColor: '#ee5555', borderDash: [6,4], fill: false, spanGaps: true }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: {display: true, position: 'bottom'} }, scales: { y: {beginAtZero: true}, x: {grid: {display:false}} } }
+        });
+    }
+
+    let topicForecastChart;
+    function drawTopicForecastChart(days) {
+        const hist_dates = topicHistDates.slice(-days), hist_counts = topicHistCounts.slice(-days);
+        const all_dates = [...hist_dates, ...topicFcastDates];
+        const ctx = document.getElementById('topicForecastLine').getContext('2d');
+        if (topicForecastChart) topicForecastChart.destroy();
+        topicForecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: all_dates,
+                datasets: [
+                    {
+                        label: 'Historical Frequency',
+                        data: [...hist_counts, null, ...Array(topicFcastValues.length).fill(null)],
+                        borderColor: '#8e44ad', backgroundColor: 'rgba(142,68,173,0.10)', fill: false, spanGaps: true
+                    },
+                    {
+                        label: 'Predicted Frequency',
+                        data: [
+                            ...Array(hist_counts.length).fill(null),
+                            hist_counts.length ? hist_counts.slice(-1)[0] : null,
+                            ...topicFcastValues
+                        ],
+                        borderColor: '#fa7070', backgroundColor: 'rgba(250,112,112,0.11)', borderDash: [6,4], fill: false, spanGaps: true
+                    }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { display: true, position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 16 }, padding: 10}}, x: { grid: { display: false }}} }
+        });
+    }
+
+    // ---- Top Topics Update Logic ----
+    function updateTopicsChart(labels, counts) {
+        topicsBarChart.data.labels = labels;
+        topicsBarChart.data.datasets[0].data = counts;
+        topicsBarChart.update();
+    }
+    function updateTopicsList(topic_list) {
+        let html = '';
+        topic_list.forEach(t => {
+            html += `<div style="margin:2px 0; color:#1683aa;"><b>${t.label}</b>: ${t.count}</div>`;
+        });
+        document.getElementById('topicsList').innerHTML = html;
+    }
+
+    // ---- Time Range logic ----
+    function setTimeRange(days) {
+        currentRange = days;
+        document.getElementById('btn7').classList.remove('active');
+        document.getElementById('btn30').classList.remove('active');
+        document.getElementById('btn90').classList.remove('active');
+        if (days === 7) document.getElementById('btn7').classList.add('active');
+        if (days === 30) document.getElementById('btn30').classList.add('active');
+        if (days === 90) document.getElementById('btn90').classList.add('active');
+
+        // Fetch & update top topics
+        fetch(`/api/top_topics?days=${days}`)
+          .then(res => res.json())
+          .then(data => {
+            updateTopicsChart(data.labels, data.counts);
+            updateTopicsList(data.topic_list);
+          });
+
+        // [ Other chart update logic ]
+        trendChart.data.labels = trendLabels.slice(-days);
+        trendChart.data.datasets[0].data = trendData.positive.slice(-days);
+        trendChart.data.datasets[1].data = trendData.neutral.slice(-days);
+        trendChart.data.datasets[2].data = trendData.negative.slice(-days);
+        trendChart.update();
+        const sumPos = trendData.positive.slice(-days).reduce((a, b) => a + b, 0);
+        const sumNeu = trendData.neutral.slice(-days).reduce((a, b) => a + b, 0);
+        const sumNeg = trendData.negative.slice(-days).reduce((a, b) => a + b, 0);
+        const total = sumPos + sumNeu + sumNeg;
+        sentimentPieChart.data.datasets[0].data = [
+            total ? Math.round((sumPos * 100) / total) : 0,
+            total ? Math.round((sumNeu * 100) / total) : 0,
+            total ? Math.round((sumNeg * 100) / total) : 0
+        ];
+        sentimentPieChart.update();
+        drawVolumeForecastChart(days);
+        drawTopicForecastChart(days);
+        drawSentimentForecastChart(days);
+    }
+    window.onload = function() { setTimeRange(7); };
+    </script>
+</body>
+</html>
