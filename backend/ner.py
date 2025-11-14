@@ -33,7 +33,7 @@ def connect_db():
     return conn
 
 def extract_entities(text):
-    #Extract named entities from text.
+    """Extract named entities from text."""
     doc = nlp(text)
     allowed_labels = {'PERSON', 'ORG', 'GPE', 'LOC'}
     unique_ents = list(set([(ent.text, ent.label_) for ent in doc.ents if ent.label_ in allowed_labels]))
