@@ -164,7 +164,7 @@
                 <div class="chart-container">
                     <canvas id="sentimentPie"></canvas>
                 </div>
-                <div style="margin-top:8px;">
+                <div id="sentimentLabels" style="margin-top:8px;">
                     <span style="color:#3db45e;">Positive ({{ sentiment_distribution.positive }}%)</span>,
                     <span style="color:#ffcc00;">Neutral ({{ sentiment_distribution.neutral }}%)</span>,
                     <span style="color:#ee5555;">Negative ({{ sentiment_distribution.negative }}%)</span>
@@ -419,6 +419,14 @@
         });
         document.getElementById('topicsList').innerHTML = html;
     }
+      
+    function updateSentimentLabels(pos, neu, neg) {
+  document.getElementById('sentimentLabels').innerHTML = `
+    <span style="color:#3db45e;">Positive (${pos}%)</span>,
+    <span style="color:#ffd56b;">Neutral (${neu}%)</span>,
+    <span style="color:#ee5555;">Negative (${neg}%)</span>
+  `;
+}
 
     // ---- Time Range logic ----
     function setTimeRange(days) {
@@ -453,10 +461,17 @@
             total ? Math.round((sumNeu * 100) / total) : 0,
             total ? Math.round((sumNeg * 100) / total) : 0
         ];
+
         sentimentPieChart.update();
+        updateSentimentLabels(
+            sentimentPieChart.data.datasets[0].data[0],
+            sentimentPieChart.data.datasets[0].data[1],
+            sentimentPieChart.data.datasets[0].data[2]
+         );
         drawVolumeForecastChart(days);
         drawTopicForecastChart(days);
         drawSentimentForecastChart(days);
+
     }
     window.onload = function() { setTimeRange(7); };
     </script>
