@@ -346,8 +346,6 @@ def analytics():
         sent_result=sent_result,
     )
 
-      
-
 @app.route("/article/<int:article_id>")
 @token_required
 def article_detail(article_id):
@@ -465,6 +463,248 @@ def suggest():
         print(f"Database error in suggestions: {err}")
         return jsonify([])
 
+# ========== ADMIN ROUTES ==========
+def is_admin(user_id):
+    """Check if user has admin privileges"""
+    conn = mysql.connect(
+        host=os.getenv("MYSQL_HOST"),
+        port=int(os.getenv("MYSQL_PORT")),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DB")
+    )
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'")
+        role_column_exists = cursor.fetchone()[0] > 0
+        
+        if role_column_exists:
+            cursor.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+            result = cursor.fetchone()
+            is_admin_user = result and result[0] == 'admin'
+        else:
+            is_admin_user = False
+            
+    except Exception as e:
+        print(f"Error checking admin status: {e}")
+        is_admin_user = False
+    finally:
+        cursor.close()
+        conn.close()
+    
+    return is_admin_user
+
+@app.route("/admin")
+@token_required
+def admin_dashboard():
+    if not is_admin(g.user_id):
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect('/dashboard')
+    
+    conn = mysql.connect(
+        host=os.getenv("MYSQL_HOST"),
+        port=int(os.getenv("MYSQL_PORT")),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DB")
+    )
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("SELECT COUNT(*) as total FROM users")
+    total_users = cursor.fetchone()['total']
+    
+    cursor.execute("SELECT COUNT(*) as admins FROM users WHERE role = 'admin'")
+    admin_users = cursor.fetchone()['admins']
+    
+    regular_users = total_users - admin_users
+    
+    cursor.execute("SELECT COUNT(*) as articles FROM news")
+    article_count = cursor.fetchone()['articles']
+    
+    cursor.execute("SELECT COUNT(*) as keywords FROM keywords")
+    keyword_count = cursor.fetchone()['keywords']
+    
+    cursor.execute("SELECT COUNT(*) as topics FROM topics")
+    topic_count = cursor.fetchone()['topics']
+    
+    cursor.execute("SELECT MIN(createdAt) as start_time FROM users")
+    start_time = cursor.fetchone()['start_time']
+    if start_time:
+        uptime = datetime.now() - start_time
+        hours, remainder = divmod(uptime.total_seconds(), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        system_uptime = f"{int(hours)}:{int(minutes):02d}:{int(seconds):02d}"
+    else:
+        system_uptime = "0:00:00"
+    
+    cursor.execute("SELECT u.id, u.email, u.role, u.createdAt, up.username FROM users u LEFT JOIN user_preferences up ON u.id = up.user_id ORDER BY u.createdAt DESC")
+    all_users = cursor.fetchall()
+    
+    conn.close()
+    
+    return render_template(
+        "admin_dashboard.html",
+        total_users=total_users,
+        admin_users=admin_users,
+        regular_users=regular_users,
+        article_count=article_count,
+        keyword_count=keyword_count,
+        topic_count=topic_count,
+        system_uptime=system_uptime,
+        avg_response=128,
+        users=all_users,
+        username=g.username,
+        current_user_id=g.user_id,
+        role=g.role
+    )
+
+@app.route("/admin/delete_user/<int:user_id>", methods=["POST"])
+@token_required
+def delete_user(user_id):
+    if not is_admin(g.user_id):
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect('/dashboard')
+    
+    if user_id == g.user_id:
+        flash("You cannot delete your own account.", "danger")
+        return redirect('/admin')
+    
+    conn = mysql.connect(
+        host=os.getenv("MYSQL_HOST"),
+        port=int(os.getenv("MYSQL_PORT")),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DB")
+    )
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("DELETE FROM user_preferences WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        conn.commit()
+        flash("User deleted successfully.", "success")
+    except Exception as e:
+        flash(f"Error deleting user: {e}", "danger")
+    finally:
+        cursor.close()
+        conn.close()
+    
+    return redirect('/admin')
+
+# ========== MISSING ADMIN FUNCTIONALITIES ==========
+
+@app.route("/admin/edit_user/<int:user_id>", methods=["POST"])
+@token_required
+def edit_user(user_id):
+    """Edit user role - MISSING FUNCTIONALITY"""
+    if not is_admin(g.user_id):
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect('/admin')
+    
+    new_role = request.form.get('role')
+    if new_role not in ['admin', 'user']:
+        flash("Invalid role specified.", "danger")
+        return redirect('/admin')
+    
+    conn = mysql.connect(
+        host=os.getenv("MYSQL_HOST"),
+        port=int(os.getenv("MYSQL_PORT")),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DB")
+    )
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("UPDATE users SET role = %s WHERE id = %s", (new_role, user_id))
+        conn.commit()
+        flash(f"User role updated successfully to {new_role}.", "success")
+    except Exception as e:
+        flash(f"Error updating user role: {e}", "danger")
+    finally:
+        cursor.close()
+        conn.close()
+    
+    return redirect('/admin')
+
+@app.route("/admin/add_user", methods=["POST"])
+@token_required
+def add_user():
+    """Add new user manually - MISSING FUNCTIONALITY"""
+    if not is_admin(g.user_id):
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect('/admin')
+    
+    email = request.form.get('email')
+    password = request.form.get('password')
+    role = request.form.get('role', 'user')
+    
+    if not email or not password:
+        flash("Email and password are required.", "danger")
+        return redirect('/admin')
+    
+    if users.register_user(email, password, role):
+        flash("User created successfully!", "success")
+    else:
+        flash("Email already exists or error creating user.", "danger")
+    
+    return redirect('/admin')
+
+@app.route("/admin/refresh_news", methods=["POST"])
+@token_required
+def refresh_news():
+    """Manual news refresh - MISSING FUNCTIONALITY"""
+    if not is_admin(g.user_id):
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect('/admin')
+    
+    try:
+        fetch_news.fetch_and_store()
+        keyword_extractor.extract_and_store_keywords()
+        topic_selection.assign_topic()
+        flash("News data refreshed successfully!", "success")
+    except Exception as e:
+        flash(f"Error refreshing news: {e}", "danger")
+    
+    return redirect('/admin')
+
+@app.route("/make_me_admin")
+@token_required
+def make_me_admin():
+    conn = mysql.connect(
+        host=os.getenv("MYSQL_HOST"),
+        port=int(os.getenv("MYSQL_PORT")),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DB")
+    )
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'")
+        role_exists = cursor.fetchone()[0] > 0
+        
+        if not role_exists:
+            cursor.execute("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user'")
+            conn.commit()
+            print("Added role column to users table")
+        
+        cursor.execute("UPDATE users SET role = 'admin' WHERE id = %s", (g.user_id,))
+        conn.commit()
+        
+        cursor.execute("SELECT email, role FROM users WHERE id = %s", (g.user_id,))
+        user = cursor.fetchone()
+        
+        flash(f"Success! {user[0]} is now an admin. Role: {user[1]}", "success")
+        
+    except Exception as e:
+        flash(f"Error: {e}", "danger")
+    finally:
+        cursor.close()
+        conn.close()
+    
+    return redirect('/admin')
 
 @app.route("/logout")
 def logout():

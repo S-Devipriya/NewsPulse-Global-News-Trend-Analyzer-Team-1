@@ -58,9 +58,33 @@
             font-weight: bold;
             color: #0b3c85;
         }
+        .status-online {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        /* New styles for user table */
+        .table-custom {
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table-custom th {
+            background-color: #0b3c85;
+            color: white;
+            font-weight: bold;
+        }
+        .badge-admin {
+            background-color: #dc3545;
+            color: white;
+        }
+        .badge-user {
+            background-color: #6c757d;
+            color: white;
+        }
     </style>
 </head>
-<body></body>
+<body>
     <nav class="navbar navbar-custom">
         <div class="container-fluid d-flex justify-content-between">
             <a class="navbar-brand d-flex align-items-center" href="/dashboard">
@@ -68,8 +92,8 @@
                 <h2>NewsPulse: Global News Trend Analyzer</h2>
             </a>
             <div class="d-flex align-items-center">
-                {% if user_role == 'admin' %}
-                    <a href="/admin/dashboard" class="nav-link active"><i class="fas fa-user-shield"></i> {{user}} </a>
+                {% if role == 'admin' %}
+                    <a href="/admin" class="nav-link active"><i class="fas fa-user-shield"></i> {{ username }} </a>
                 {% endif %}
                 <a href="/dashboard" class="nav-link"><i class="fas fa-search"></i> User Dashboard</a>
                 <a href="/trends" class="nav-link"><i class="fas fa-fire"></i> Trends</a>
@@ -89,71 +113,277 @@
                         <h2 class="card-title text-center mb-0">
                             <i class="fas fa-user-shield"></i> Admin Dashboard
                         </h2>
+                        <p class="text-center mb-0 mt-2" style="color: #0b3c85;">Manage users and monitor system activity</p>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Quick Stats Row 1 -->
         <div class="row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card card-custom h-100">
                     <div class="card-body text-center">
                         <i class="fas fa-users stat-card-icon mb-3"></i>
-                        <h5 class="stat-card-title">Regular Users</h5>
-                        <p class="stat-card-value">{{ stats.user_count }}</p>
+                        <h5 class="stat-card-title">Total Users</h5>
+                        <p class="stat-card-value">{{ total_users }}</p>
+                        <small class="text-muted">Registered accounts</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
+                <div class="card card-custom h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-user-shield stat-card-icon mb-3"></i>
+                        <h5 class="stat-card-title">Admin Users</h5>
+                        <p class="stat-card-value">{{ admin_users }}</p>
+                        <small class="text-muted">Administrator accounts</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-custom h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-user stat-card-icon mb-3"></i>
+                        <h5 class="stat-card-title">Regular Users</h5>
+                        <p class="stat-card-value">{{ regular_users }}</p>
+                        <small class="text-muted">Standard accounts</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
                 <div class="card card-custom h-100">
                     <div class="card-body text-center">
                         <i class="fas fa-server stat-card-icon mb-3"></i>
-                        <h5 class="stat-card-title">System Uptime</h5>
-                        <p class="stat-card-value" style="font-size: 2rem;">{{ stats.system_uptime }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card card-custom h-100">
-                    <div class="card-body text-center">
-                        <i class="fas fa-tachometer-alt stat-card-icon mb-3"></i>
-                        <h5 class="stat-card-title">Avg. Response Time</h5>
-                        <p class="stat-card-value">{{ stats.avg_response }}</G></p>
+                        <h5 class="stat-card-title">System Status</h5>
+                        <p class="stat-card-value status-online" style="font-size: 1.5rem;">Online</p>
+                        <small class="text-muted">All services operational</small>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Quick Stats Row 2 -->
         <div class="row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card card-custom h-100">
                     <div class="card-body text-center">
                         <i class="fas fa-newspaper stat-card-icon mb-3"></i>
                         <h5 class="stat-card-title">Total Articles</h5>
-                        <p class="stat-card-value">{{ stats.article_count }}</p>
+                        <p class="stat-card-value">{{ article_count }}</p>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card card-custom h-100">
                     <div class="card-body text-center">
                         <i class="fas fa-key stat-card-icon mb-3"></i>
                         <h5 class="stat-card-title">Total Keywords</h5>
-                        <p class="stat-card-value">{{ stats.keyword_count }}</g></p>
+                        <p class="stat-card-value">{{ keyword_count }}</p>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card card-custom h-100">
                     <div class="card-body text-center">
                         <i class="fas fa-tags stat-card-icon mb-3"></i>
                         <h5 class="stat-card-title">Total Topics</h5>
-                        <p class="stat-card-value">{{ stats.topic_count }}</p>
+                        <p class="stat-card-value">{{ topic_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-custom h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tachometer-alt stat-card-icon mb-3"></i>
+                        <h5 class="stat-card-title">Avg. Response Time</h5>
+                        <p class="stat-card-value">{{ avg_response }}ms</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MISSING: All Users Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card card-custom">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">All Users</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                <i class="fas fa-plus"></i> Add User
+                            </button>
+                        </div>
+                        <p class="text-muted">Manage and monitor user accounts ({{ users|length }} total)</p>
+                        
+                        <!-- Users Table -->
+                        <div class="table-responsive">
+                            <table class="table table-hover table-custom">
+                                <thead>
+                                    <tr>
+                                        <th>NAME</th>
+                                        <th>EMAIL</th>
+                                        <th>ROLE</th>
+                                        <th>REGISTERED</th>
+                                        <th>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in users %}
+                                    <tr>
+                                        <td>
+                                            {% if user.username %}
+                                                {{ user.username }}
+                                            {% else %}
+                                                {{ user.email.split('@')[0] }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ user.email }}</td>
+                                        <td>
+                                            <span class="badge {% if user.role == 'admin' %}badge-admin{% else %}badge-user{% endif %}">
+                                                {{ user.role if user.role else 'user' }}
+                                            </span>
+                                        </td>
+                                        <td>{{ user.createdAt.strftime('%Y-%m-%d') if user.createdAt else 'N/A' }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <!-- Edit Role Button -->
+                                                <button class="btn btn-outline-primary" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#editUserModal" 
+                                                        data-user-id="{{ user.id }}"
+                                                        data-user-email="{{ user.email }}"
+                                                        data-user-role="{{ user.role if user.role else 'user' }}">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                {% if user.id != current_user_id %}
+                                                <form action="/admin/delete_user/{{ user.id }}" method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-outline-danger" 
+                                                            onclick="return confirm('Are you sure you want to delete {{ user.email }}?')">
+                                                        <i class="fas fa-trash"></i> Delete
+                                                    </button>
+                                                </form>
+                                                {% else %}
+                                                <span class="btn btn-outline-secondary disabled">Current User</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Actions Section -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card card-custom">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">System Actions</h5>
+                        <form action="/admin/refresh_news" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-sync-alt"></i> Refresh News Data
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
 
     </div>
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="/admin/add_user" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role</label>
+                            <select class="form-select" name="role">
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add User</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit User Role</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editUserForm" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="text" class="form-control" id="editUserEmail" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role</label>
+                            <select class="form-select" name="role" id="editUserRole">
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Role</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- JavaScript for Edit Modal -->
+    <script>
+        var editUserModal = document.getElementById('editUserModal');
+        editUserModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var userId = button.getAttribute('data-user-id');
+            var userEmail = button.getAttribute('data-user-email');
+            var userRole = button.getAttribute('data-user-role');
+            
+            var modal = this;
+            modal.querySelector('#editUserEmail').value = userEmail;
+            modal.querySelector('#editUserRole').value = userRole;
+            
+            // Update form action
+            var form = modal.querySelector('#editUserForm');
+            form.action = '/admin/edit_user/' + userId;
+        });
+    </script>
 </body>
 </html>

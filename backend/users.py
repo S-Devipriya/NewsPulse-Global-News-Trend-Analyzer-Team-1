@@ -27,7 +27,8 @@ def connect_db():
     conn.commit()
     return conn
 
-def register_user(email, password):
+def register_user(email, password, role='user'):
+    """Register a new user with optional role"""
     conn = connect_db()
     cursor = conn.cursor()
     
@@ -43,7 +44,7 @@ def register_user(email, password):
     now = datetime.now()
     
     try:
-        cursor.execute("INSERT INTO users (email, password, role, createdAt) VALUES (%s, %s, %s, %s)", (email, hashed_password, 'user', now))
+        cursor.execute("INSERT INTO users (email, password, role, createdAt) VALUES (%s, %s, %s, %s)", (email, hashed_password, role, now))
         conn.commit()
         user_profile.update_user_profile(cursor.lastrowid, "", "", "")
     except mysql.connector.Error as err:
