@@ -27,11 +27,13 @@ from analytics_utils import (
 )
 
 # Import sentiment and NER logic
-from sentiment import analyze_sentiment, save_sentiment
-from ner import extract_entities, save_entities
+from sentiment import analyze_and_save_sentiments
+from ner import analyze_and_save_entities
 
 # ADD THIS IMPORT for trend analysis
 from trend_detector import TrendDetector
+
+app_start_time = datetime.now()
 
 load_dotenv()
 
@@ -39,6 +41,8 @@ def fetch_from_db(search_query):
     fetch_news.fetch_and_store()
     keyword_extractor.extract_and_store_keywords()
     topic_selection.assign_topic()
+    analyze_and_save_sentiments()
+    analyze_and_save_entities()
     try:
         connection = mysql.connect(
             host = os.getenv("MYSQL_HOST"),
@@ -53,31 +57,92 @@ def fetch_from_db(search_query):
         articles = []
         return articles
 
-    articles = []
+    sql_select_clause = """SELECT
+                            n.id, n.title, n.source, n.publishedAt, n.url, n.description, n.imageurl,
+                            k.keywords,
+                            s.positive, s.neutral, s.negative, s.overall,
+                            t.name AS topic_name
+                        FROM news n
+                        LEFT JOIN keywords k ON n.id = k.article_id
+                        LEFT JOIN sentiments s ON n.id = s.article_id
+                        LEFT JOIN article_topics_mapping atm ON n.id = atm.article_id
+                        LEFT JOIN topics t ON atm.topic_id = t.id"""
+    articles_raw = []
     if search_query:
         cleaned_search_query = preprocess_text(search_query)
         if cleaned_search_query:
-            sql_query = """
-                SELECT id, title, source, publishedAt, url, description, imageurl, keywords, topic FROM news
-                WHERE
-                    LOWER(title) LIKE %s OR
-                    LOWER(description) LIKE %s OR
-                    LOWER(keywords) LIKE %s OR
-                    LOWER(topic) LIKE %s
-                ORDER BY publishedAt DESC
-            """
+            # Add the WHERE clause for searching
+            sql_query = sql_select_clause + """ WHERE
+                                                LOWER(n.title) LIKE %s OR
+                                                LOWER(n.description) LIKE %s OR
+                                                LOWER(k.keywords) LIKE %s OR
+                                                LOWER(t.name) LIKE %s
+                                            ORDER BY n.publishedAt DESC"""
             query_param = f"%{cleaned_search_query.lower()}%"
             cursor.execute(sql_query, (query_param, query_param, query_param, query_param))
-            articles = cursor.fetchall()
+            articles_raw = cursor.fetchall()
         else:
-            articles = []
+            articles_raw = []
     else:
-        sql_query = "SELECT id, title, source, publishedAt, url, description, imageurl, keywords, topic FROM news ORDER BY publishedAt DESC"
+        sql_query = sql_select_clause + " ORDER BY n.publishedAt DESC"
         cursor.execute(sql_query)
-        articles = cursor.fetchall()
+        articles_raw = cursor.fetchall()
+
+    if not articles_raw:
+        connection.close()
+        return []
+    
+    articles_dict = {}
+    article_ids = []
+    for row in articles_raw:
+        # Nested sentiment dict
+        row['sentiment'] = {
+            'positive': row.get('positive'),
+            'neutral': row.get('neutral'),
+            'negative': row.get('negative'),
+            'overall': row.get('overall')
+        } if row.get('overall') else None
+        
+        # Placeholder for entities
+        row['entities'] = {
+            'people': [],
+            'organizations': [],
+            'locations': []
+        }
+        
+        # Renaming 'topic_name' to 'topic' for the template
+        row['topic'] = row.get('topic_name')
+        
+        # Cleaning up flat keys
+        for key in ['positive', 'neutral', 'negative', 'overall', 'topic_name']:
+            if key in row:
+                del row[key]
+        
+        articles_dict[row['id']] = row
+        article_ids.append(row['id'])
+
+    ids_placeholder = ','.join(['%s'] * len(article_ids))
+    entity_query = f"""SELECT article_id, name, type 
+                    FROM entities 
+                    WHERE article_id IN ({ids_placeholder})"""
+    cursor.execute(entity_query, tuple(article_ids))
+    entities_raw = cursor.fetchall()
+
+    for entity in entities_raw:
+        article_id = entity['article_id']
+        if article_id in articles_dict:
+            ent_type = entity['type']
+            ent_name = entity['name']
+            if ent_type == 'PERSON':
+                articles_dict[article_id]['entities']['people'].append(ent_name)
+            elif ent_type == 'ORG':
+                articles_dict[article_id]['entities']['organizations'].append(ent_name)
+            elif ent_type in ['GPE', 'LOC']:
+                articles_dict[article_id]['entities']['locations'].append(ent_name)
 
     connection.close()
-    return articles
+    
+    return list(articles_dict.values())
 
 def generate_summary(articles, user_query=None, max_keywords=3, max_entities=3):
     keyword_list = []
@@ -154,8 +219,19 @@ def token_required(f):
             flash('Your session has expired. Please log in again.', 'danger')
             return redirect('/login')
         except Exception as e:
+            print({e})
             flash('Authentication token is invalid!', 'danger')
             return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    @token_required  # First, ensure user is logged in
+    def decorated(*args, **kwargs):
+        if g.role != 'admin':
+            flash('You do not have permission to access this page.', 'danger')
+            return redirect('/dashboard')
         return f(*args, **kwargs)
     return decorated
 
@@ -178,9 +254,19 @@ def login():
         email = request.form["email"]
         password = request.form["password"]
         secret_key = os.getenv("FLASK_SECRET_KEY")
-        token = users.login_user(email, password, secret_key)
-        if token:
+        user_data = users.login_user(email, password)
+        if user_data:
+            token_payload = {
+                'exp': datetime.utcnow() + timedelta(days=1),
+                'iat': datetime.utcnow(),
+                'sub': str(user_data['id']),
+                'username': user_data.get('username', user_data['email']),
+                'role': user_data.get('role', 'user')
+            }
+            token = jwt.encode(token_payload, secret_key, algorithm='HS256')
+            
             response = make_response(redirect('/dashboard'))
+                
             response.set_cookie('token', token, httponly=True, samesite='Lax')
             return response
         else:
@@ -203,7 +289,8 @@ def profile():
                 'exp': datetime.utcnow() + timedelta(days=1),
                 'iat': datetime.utcnow(),
                 'sub': str(g.user_id),
-                'username': username
+                'username': username,
+                'role': g.role
             }
             new_token = jwt.encode(new_payload, secret_key, algorithm='HS256')
             response = make_response(redirect("/profile"))
@@ -215,7 +302,7 @@ def profile():
             flash("Profile updated, but session could not be refreshed. Please log in again.", "warning")
             return redirect("/login")
     user = user_profile.get_user_profile(user_id)
-    return render_template("profile.html", user=user)
+    return render_template("profile.html", user=user, user_role=g.role)
 
 @app.route("/dashboard", methods=["GET", "POST"])
 @token_required
@@ -228,27 +315,72 @@ def dashboard():
     detector = TrendDetector()
     trends_data = detector.get_daily_trends()
     
-    enriched_news = []
-    for article in news_items:
-        text = f"{article.get('title', '')}. {article.get('description', '')}"
-        article_id = article['id']
-        sentiment = analyze_sentiment(text)
-        save_sentiment(article_id, sentiment)
-        entities_list = extract_entities(text)  # This returns a LIST, not dict
-        save_entities(article_id, entities_list)  # Pass the list directly
-        article['sentiment'] = sentiment
-        article['entities'] = entities_list  # Store the list
-        enriched_news.append(article)
-    
     return render_template(
         "dashboard.html",
-        news=enriched_news,
+        news=news_items,
         user=g.username,
+        user_role=g.role,
         query=query,
         summary=summary,
         trends_data=trends_data,
-        now=datetime.now(),
-        role=g.role
+        now=datetime.now()
+    )
+
+@app.route("/admin/dashboard")
+@admin_required 
+def admin_dashboard():
+    stats = {
+        'avg_response': '128ms',
+        'user_count': 0,
+        'article_count': 0,
+        'keyword_count': 0,
+        'topic_count': 0,
+        'system_uptime': 'N/A'
+    }
+    
+    try:
+        uptime_delta = datetime.now() - app_start_time
+        stats['system_uptime'] = str(uptime_delta).split('.')[0]
+        
+        connection = mysql.connect(
+            host = os.getenv("MYSQL_HOST"),
+            port = int(os.getenv("MYSQL_PORT")),
+            user = os.getenv("MYSQL_USER"),
+            password = os.getenv("MYSQL_PASSWORD"),
+            database = os.getenv("MYSQL_DB")
+        )
+        cursor = connection.cursor()
+        
+        # Get Regular Users
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'user'")
+        stats['user_count'] = cursor.fetchone()[0]
+        
+        # Get Article Count
+        cursor.execute("SELECT COUNT(*) FROM news")
+        stats['article_count'] = cursor.fetchone()[0]
+
+        # Get Keyword Count
+        cursor.execute("SELECT COUNT(*) FROM keywords")
+        stats['keyword_count'] = cursor.fetchone()[0]
+
+        # Get Topic Count
+        cursor.execute("SELECT COUNT(*) FROM topics")
+        stats['topic_count'] = cursor.fetchone()[0]
+        
+        connection.close()
+
+    except mysql.Error as err:
+        print(f"Error connecting to DB for admin stats: {err}")
+        flash("Could not load all database statistics.", "warning")
+    except Exception as e:
+        print(f"Error in admin dashboard: {e}")
+        flash("An error occurred loading admin data.", "danger")
+
+    return render_template(
+        "admin_dashboard.html",
+        user=g.username,
+        user_role=g.role,
+        stats=stats
     )
 
 # ========== TREND ANALYSIS ROUTES ==========
@@ -264,8 +396,8 @@ def trends():
         "trends.html",
         trends_data=trends_data,
         user=g.username,
-        now=datetime.now(),
-        role=g.role
+        user_role=g.role,
+        now=datetime.now()
     )
 
 @app.route("/trending-articles")
@@ -360,70 +492,59 @@ def article_detail(article_id):
         )
         cursor = connection.cursor(dictionary=True)
         
-        cursor.execute("""
-            SELECT n.*, s.sentiment_score, s.sentiment_label 
-            FROM news n
-            LEFT JOIN sentiment s ON n.id = s.article_id
-            WHERE n.id = %s
-        """, (article_id,))
+        cursor.execute("""SELECT 
+                            n.*, 
+                            k.keywords,
+                            s.positive, s.neutral, s.negative, s.overall,
+                            t.name as topic_name
+                        FROM news n
+                        LEFT JOIN keywords k ON n.id = k.article_id
+                        LEFT JOIN sentiments s ON n.id = s.article_id
+                        LEFT JOIN article_topics_mapping atm ON n.id = atm.article_id
+                        LEFT JOIN topics t ON atm.topic_id = t.id
+                        WHERE n.id = %s""", (article_id,))
         
         article = cursor.fetchone()
         
-        # Get entities separately
-        cursor.execute("""
-            SELECT people, organizations, locations 
-            FROM entities 
-            WHERE article_id = %s
-        """, (article_id,))
+        if not article:
+            connection.close()
+            flash("Article not found!", "danger")
+            return redirect("/dashboard")
+
+        article['sentiment'] = {
+            'positive': article.get('positive'),
+            'neutral': article.get('neutral'),
+            'negative': article.get('negative'),
+            'overall': article.get('overall')
+        } if article.get('overall') else None
+        article['topic'] = article.get('topic_name')
         
-        entities_result = cursor.fetchone()
+        cursor.execute("""SELECT name, type FROM entities WHERE article_id = %s""", (article_id,))
+        
+        entities_raw = cursor.fetchall()
         connection.close()
         
-        if not article:
-            flash("Article not found!", "danger")
-            return redirect("/trends")
-        
-        # Process entities
-        entities = {
-            'people': entities_result['people'].split(',') if entities_result and entities_result['people'] else [],
-            'organizations': entities_result['organizations'].split(',') if entities_result and entities_result['organizations'] else [],
-            'locations': entities_result['locations'].split(',') if entities_result and entities_result['locations'] else []
-        }
+        entities = {'people': [], 'organizations': [], 'locations': []}
+        for ent in entities_raw:
+            if ent['type'] == 'PERSON':
+                entities['people'].append(ent['name'])
+            elif ent['type'] == 'ORG':
+                entities['organizations'].append(ent['name'])
+            elif ent['type'] in ['GPE', 'LOC']:
+                entities['locations'].append(ent['name'])
         
         return render_template(
             "article_detail.html",
             article=article,
             entities=entities,
             user=g.username,
-            role=g.role
+            user_role=g.role
         )
         
     except Exception as e:
         print(f"Error fetching article: {e}")
         flash("Error loading article!", "danger")
         return redirect("/trends")
-
-@app.route("/analyze-sentiment", methods=["POST"])
-@token_required
-def sentiment_api():
-    data = request.get_json()
-    text = data.get('text', '')
-    article_id = data.get('article_id')
-    sentiment = analyze_sentiment(text)
-    if article_id:
-        save_sentiment(article_id, sentiment)
-    return jsonify(sentiment)
-
-@app.route("/extract-entities", methods=["POST"])
-@token_required
-def ner_api():
-    data = request.get_json()
-    text = data.get('text', '')
-    article_id = data.get('article_id')
-    entities_list = extract_entities(text)  # FIXED: This returns a LIST
-    if article_id:
-        save_entities(article_id, entities_list)  # FIXED: Pass list directly
-    return jsonify(entities_list)  # FIXED: Return the list
 
 @app.route('/api/suggest')
 def suggest():
@@ -439,17 +560,15 @@ def suggest():
             database = os.getenv("MYSQL_DB")
         )
         cursor = connection.cursor()
-        cursor.execute("""
-            SELECT DISTINCT topic FROM news
-            WHERE LOWER(topic) LIKE %s AND topic IS NOT NULL
-            LIMIT 5
-        """, (f"%{query}%",))
+        
+        cursor.execute("""SELECT DISTINCT name FROM topics
+                            WHERE LOWER(name) LIKE %s AND name IS NOT NULL
+                            LIMIT 5""", (f"%{query}%",))
         topics = [row[0] for row in cursor.fetchall() if row[0]]
-        cursor.execute("""
-            SELECT DISTINCT keywords FROM news
-            WHERE LOWER(keywords) LIKE %s AND keywords IS NOT NULL
-            LIMIT 10
-        """, (f"%{query}%",))
+        
+        cursor.execute("""SELECT DISTINCT keywords FROM keywords
+                            WHERE LOWER(keywords) LIKE %s AND keywords IS NOT NULL
+                            LIMIT 10""", (f"%{query}%",))
         keywords = []
         for row in cursor.fetchall():
             for word in row[0].split(","):
@@ -717,10 +836,6 @@ def logout():
 def home():
     fetch_news.create_database()
     return render_template("home.html")
-
-# ========== ADMIN: Initialize admin user on startup ==========
-with app.app_context():
-    users.create_admin_user()
 
 if __name__ == "__main__":
     app.run(debug=True)
