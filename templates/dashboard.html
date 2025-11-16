@@ -196,7 +196,7 @@
                 <a href="/profile" class="nav-link"><i class="fas fa-cog"></i> Profile</a>
                 <a href="/analytics" class="nav-link"><i class="fa-solid fa-chart-line"></i> Analytics</a>
                 <a href="/logout" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
-                {% if role == 'admin' %}
+                {% if user_role == 'admin' %}
                     <a href="/admin" class="nav-link admin-link">
                         <i class="fas fa-shield-alt"></i> Admin Panel
                     </a>

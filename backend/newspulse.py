@@ -326,63 +326,6 @@ def dashboard():
         now=datetime.now()
     )
 
-@app.route("/admin/dashboard")
-@admin_required 
-def admin_dashboard():
-    stats = {
-        'avg_response': '128ms',
-        'user_count': 0,
-        'article_count': 0,
-        'keyword_count': 0,
-        'topic_count': 0,
-        'system_uptime': 'N/A'
-    }
-    
-    try:
-        uptime_delta = datetime.now() - app_start_time
-        stats['system_uptime'] = str(uptime_delta).split('.')[0]
-        
-        connection = mysql.connect(
-            host = os.getenv("MYSQL_HOST"),
-            port = int(os.getenv("MYSQL_PORT")),
-            user = os.getenv("MYSQL_USER"),
-            password = os.getenv("MYSQL_PASSWORD"),
-            database = os.getenv("MYSQL_DB")
-        )
-        cursor = connection.cursor()
-        
-        # Get Regular Users
-        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'user'")
-        stats['user_count'] = cursor.fetchone()[0]
-        
-        # Get Article Count
-        cursor.execute("SELECT COUNT(*) FROM news")
-        stats['article_count'] = cursor.fetchone()[0]
-
-        # Get Keyword Count
-        cursor.execute("SELECT COUNT(*) FROM keywords")
-        stats['keyword_count'] = cursor.fetchone()[0]
-
-        # Get Topic Count
-        cursor.execute("SELECT COUNT(*) FROM topics")
-        stats['topic_count'] = cursor.fetchone()[0]
-        
-        connection.close()
-
-    except mysql.Error as err:
-        print(f"Error connecting to DB for admin stats: {err}")
-        flash("Could not load all database statistics.", "warning")
-    except Exception as e:
-        print(f"Error in admin dashboard: {e}")
-        flash("An error occurred loading admin data.", "danger")
-
-    return render_template(
-        "admin_dashboard.html",
-        user=g.username,
-        user_role=g.role,
-        stats=stats
-    )
-
 # ========== TREND ANALYSIS ROUTES ==========
 
 @app.route("/trends")
@@ -675,7 +618,7 @@ def admin_dashboard():
         users=all_users,
         username=g.username,
         current_user_id=g.user_id,
-        role=g.role
+        user_role=g.role
     )
 
 @app.route("/admin/delete_user/<int:user_id>", methods=["POST"])
