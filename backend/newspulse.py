@@ -419,6 +419,7 @@ def analytics():
         trend_over_time=trend_over_time,
         vol_result=vol_result,
         sent_result=sent_result,
+        user=g.username,
     )
 
 @app.route("/article/<int:article_id>")
@@ -616,7 +617,7 @@ def admin_dashboard():
         system_uptime=system_uptime,
         avg_response=128,
         users=all_users,
-        username=g.username,
+        user=g.username,
         current_user_id=g.user_id,
         user_role=g.role
     )

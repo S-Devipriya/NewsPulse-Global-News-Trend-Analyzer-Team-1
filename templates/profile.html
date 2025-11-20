@@ -15,23 +15,31 @@
       margin: 0;
     }
     .profile-card {
-      background-color: rgb(151, 230, 237);
+      background-color: rgb(214, 210, 242);
       padding: 30px;
       border-radius: 12px;
       box-shadow: 0px 6px 20px rgba(0,0,0,0.2);
       width: 100%;
-      max-width: 430px;
+      max-width: 400px;
     }
     .form-icon {
       display: block;
       margin: 0 auto 20px auto;
       width: 100px;
     }
-    .btn {
-      color:rgb(255, 255, 255);
-      background-color: rgba(24, 45, 150, 0.803);
-      margin: 10px;
-      border: none;
+    .btn { 
+      color: #ffffff; 
+      background-color: rgb(45, 30, 125); 
+      margin: 10px; 
+    }
+    .btn-custom { 
+      color: rgb(255, 255, 255); 
+      background-color: rgb(45, 30, 125); 
+      border: none; 
+    }
+    .btn-custom:hover { 
+      color: white; 
+      background-color: rgb(58, 47, 136); 
     }
   </style>
 </head>
@@ -83,12 +91,12 @@
       </div>
 
       <div class="text-center">
-        <button type="submit" class="btn btn-primary">Update Profile</button>
+        <button type="submit" class="btn btn-custom me-2">Update Profile</button>
       </div>
     </form>
 
     <div class="text-center">
-      <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+      <a href="/dashboard" class="btn btn-custom me-2">Back to Dashboard</a>
     </div>
   </div>
 </body>

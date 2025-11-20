@@ -10,22 +10,19 @@
       display: flex;
       flex-direction: column;
     }
-
     .split-screen-container {
       display: flex;
       flex-grow: 1;
     }
-
     .left-panel {
       flex-basis: 30%;
-      background-color: rgb(151, 230, 237);
+      background-color: rgb(214, 210, 242);
       display: flex;
       justify-content: center;
       align-items: center;
       text-align: center;
       padding: 30px;
     }
-
     .right-panel {
       flex-basis: 70%;
       background-image: url('/static/images/background.png');
@@ -34,9 +31,8 @@
       justify-content: center;
       align-items: center;
     }
-
     .message-card {
-      background-color: rgba(151, 230, 237, 0.5);
+      background-color: rgba(214, 210, 242, 0.6);
       padding: 30px;
       border-radius: 12px;
       box-shadow: none;
@@ -46,56 +42,56 @@
       color: rgb(34, 35, 36);
       font-size: 20px;
     }
-
     .header-container {
       display: flex;
-      background-color: rgb(151, 230, 237);
+      background-color: rgb(214, 210, 242);
       justify-content: center;
       align-items: center;
       margin-bottom: 10px;
     }
-
     .welcome-icon {
       width: 200px;
       height: auto;
     }
-
     h2 {
       margin-bottom: 10px;
       font-weight: bold;
       font-size: 32px;
-      color: #0b3c85;
+      color: rgb(45, 30, 125);
     }
-
     h3 {
       margin-bottom: 20px;
       font-size: 24px;
-      color: rgb(26, 92, 161);
+      color: rgb(117, 37, 183);
     }
-
-    .btn {
-      margin: 15px;
-      color:rgb(255, 255, 255);
-      background-color: rgba(11, 60, 133);
+    .btn { 
+      color: #ffffff; 
+      background-color: rgb(45, 30, 125); 
+      margin: 10px; 
     }
-
+    .btn-custom { 
+      color: rgb(255, 255, 255); 
+      background-color: rgb(45, 30, 125); 
+      border: none; 
+    }
+    .btn-custom:hover { 
+      color: white; 
+      background-color: rgb(58, 47, 136); 
+    }
     footer {
       width: 100%;
-      background-color: rgba(11, 60, 133, 0.9);
+      background-color: rgb(117, 37, 183);
       color: white;
       padding: 10px 0;
       text-align: center;
     }
-    
     footer p {
       margin: 0;
     }
-
     footer a {
       color: #97e6ed;
       text-decoration: none;
     }
-
     footer a:hover {
       color: #97e6ed;
       text-decoration: underline;
@@ -108,23 +104,23 @@
     <div class="left-panel">
       <div class="welcome-content">
         <div class="header-container">
-          <img src="/static/images/icon.png" alt="App Icon" class="welcome-icon">
+          <img src="/static/images/full_icon.png" alt="App Icon" class="welcome-icon">
         </div>
-          <h2>Welcome to NewsPulse</h2>
+          <h2>Welcome to Veritascope</h2>
           <h3>Your Global News Trend Analyzer</h3>
       </div>
     </div>
 
     <div class="right-panel">
       <div class="message-card">
-        <h2>Stay Informed with NewsPulse</h2>
+        <h2>Gain Insights beyond Headlines with Veritascope</h2>
         <br>
         <p><strong>Discover the latest global news trends, analyze patterns, 
           and stay ahead with our cutting-edge news analysis platform. Whether 
           you're a casual reader or a dedicated analyst, NewsPulse provides you 
           with the tools you need to understand the world around you.</strong></p>
         <div class="d-flex justify-content-center">
-          <a href="/login" class="btn btn-primary">Get Started</a>
+          <a href="/login" class="btn btn-custom me-2">Get Started</a>
         </div>
       </div>
     </div>
