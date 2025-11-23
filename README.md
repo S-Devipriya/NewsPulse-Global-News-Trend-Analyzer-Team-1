@@ -76,9 +76,13 @@ News API Configuration
 NEWS_API_KEY=your_news_api_key_here
 
 MySQL Database Configuration
+
 DB_HOST=localhost
+
 DB_USER=your_mysql_username
+
 DB_PASSWORD=your_mysql_password
+
 DB_NAME=veritascope_db
 
 Flask Configuration
