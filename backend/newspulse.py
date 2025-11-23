@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 from functools import wraps
 import jwt
+import re
 from datetime import datetime, timedelta
 from collections import Counter
 
@@ -235,26 +236,46 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+
+def validate(email):
+    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(pattern, email) is not None
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        email = request.form["email"]
+        email = request.form["email"].strip()
         password = request.form["password"]
+
+        # --- EMAIL VALIDATION ---
+        if not validate(email):
+            flash("Invalid email format! Please enter a correct email.", "danger")
+            return redirect("/register")
+
+        # --- PROCEED IF EMAIL IS VALID ---
         if users.register_user(email, password):
             flash("Registration successful! Please Login.", "success")
             return redirect("/login")
         else:
             flash("Email already exists. Please choose another.", "danger")
             return redirect("/register")
+
     return render_template("register.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"]
+        email = request.form["email"].strip()
         password = request.form["password"]
+
+        # --- EMAIL VALIDATION ---
+        if not validate(email):
+            flash("Please enter a valid email.", "danger")
+            return redirect("/login")
+
         secret_key = os.getenv("FLASK_SECRET_KEY")
         user_data = users.login_user(email, password)
+
         if user_data:
             token_payload = {
                 'exp': datetime.utcnow() + timedelta(days=1),
@@ -263,16 +284,20 @@ def login():
                 'username': user_data.get('username', user_data['email']),
                 'role': user_data.get('role', 'user')
             }
+
             token = jwt.encode(token_payload, secret_key, algorithm='HS256')
-            
+
             response = make_response(redirect('/dashboard'))
-                
             response.set_cookie('token', token, httponly=True, samesite='Lax')
+
             return response
+
         else:
             flash("Invalid email or password!", "danger")
             return redirect("/login")
+
     return render_template("login.html")
+
 
 @app.route("/profile", methods=["GET", "POST"])
 @token_required

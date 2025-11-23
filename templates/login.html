@@ -79,7 +79,25 @@
     <form method="POST">
       <div class="mb-3">
         <label class="form-label">Email</label>
-        <input type="text" name="email" class="form-control" placeholder="Enter email" required>
+        <input type="text" id="email" name="email" class="form-control" onkeyup="validateEmail()" required>
+<span id="text"></span>
+
+<script>
+function validateEmail() {
+    let email = document.getElementById("email").value;
+    let text = document.getElementById("text");
+    let pattern = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+
+    if (email.match(pattern)) {
+        text.innerHTML = "Valid Email ✓";
+        text.style.color = "#29bf12";
+    } else {
+        text.innerHTML = "Invalid Email ✗";
+        text.style.color = "#e70e02";
+    }
+}
+</script>
+
       </div>
       <div class="mb-3">
         <label class="form-label">Password</label>
