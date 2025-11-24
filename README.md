@@ -83,7 +83,7 @@ DB_USER=your_mysql_username
 
 DB_PASSWORD=your_mysql_password
 
-DB_NAME=veritascope_db
+DB_NAME=newsdb
 
 Flask Configuration
 FLASK_SECRET_KEY=your_secret_key_here
@@ -96,7 +96,7 @@ FLASK_SECRET_KEY=your_secret_key_here
 
 Create the MySQL database:
 
-CREATE DATABASE veritascope_db;
+CREATE DATABASE newsdb;
 
 The application will automatically create the necessary tables on first run.
 
