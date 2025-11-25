@@ -134,37 +134,37 @@
         .suggest-item:hover {
             background: #e9f2ff;
         }
-        /* --- Summary Card --- */
-        .news-summary-container {
+        .summary-container-row {
             display: flex;
-            justify-content: left;
-            margin-bottom: 1.5em;
+            align-items: stretch; 
+            min-height: 100px; /* Ensures height for the text */
         }
-        .news-summary-card {
-            background: rgb(214, 210, 242);
-            color: #181818;
-            font-size: 1.15em;
-            border-radius: 16px;
-            border: 2px solid rgb(214, 210, 242);
-            box-shadow: 0 4px 20px rgba(30,80,140,0.11);
-            padding: 18px 26px 18px 20px;
+        .summary-header-side {
+            background-color: rgb(117, 37, 183);
+            color: rgb(214, 210, 242);
+            font-weight: bold;
+            width: 50px; /* Fixed width for the sidebar */
             display: flex;
             align-items: center;
-            min-width: 350px;
-            max-width: 900px;
+            justify-content: center;
+            writing-mode: vertical-rl; /* Makes text vertical */
+            text-orientation: mixed;
+            transform: rotate(180deg); /* Flips it so it reads bottom-to-top */
+            padding: 10px 0;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
         }
-        .news-summary-label {
-            font-weight: bold;
-            margin-right: 20px;
+        .summary-content {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Space between text and buttons */
         }
         .summary-text {
-            font-weight: 400;
+            font-size: 1.15em;
+            color: #181818;
             margin-right: 20px;
-            transition: background 0.2s;
-        }
-        .news-summary-card button {
-            margin-left: 10px;
-            min-width: 55px;
         }
         .trend-card {
             background-color: rgb(214, 210, 242); 
@@ -180,6 +180,35 @@
         }
         .trend-card:hover {
             transform: translateY(-2px);
+        }
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            margin-bottom: 40px;
+        }
+        .page-link {
+            color: rgb(45, 30, 125);
+            border: 1px solid rgb(45, 30, 125);
+            background-color: rgb(214, 210, 242);
+            margin: 0 2px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .page-link:hover {
+            background-color: rgb(45, 30, 125);
+            color: rgb(214, 210, 242);
+        }
+        .page-item.active .page-link {
+            background-color: rgb(45, 30, 125);
+            color: rgb(214, 210, 242);
+            border-color: rgb(45, 30, 125);
+        }
+        .page-item.disabled .page-link {
+            color: #6c757d;
+            pointer-events: none;
+            background-color: rgb(214, 210, 242);
+            border-color: #dee2e6;
         }
     </style>
 </head>
@@ -289,15 +318,23 @@
             </div>
         </div>
         <!-- ========== END TREND ANALYSIS SECTION ========== -->
-
-        <!-- Highlighted Summary Card -->
+       
+        <!-- Summary Card -->
         {% if summary %}
-        <div class="news-summary-container">
-            <div class="news-summary-card">
-                <span class="news-summary-label">  Summary  </span>
-                <span class="summary-text" id="read-summary">{{ summary }}</span>
-                <button onclick="speakSummary()" class="btn btn-custom me-2">🔊 Speak </button>
-                <button onclick="stopSummary()" class="btn btn-custom me-2">⏹ Stop </button>
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card trend-card">
+                    <div class="summary-container-row">
+                        <div class="summary-header-side">
+                            SUMMARY
+                        </div>
+                        <div class="summary-content">
+                            <span class="summary-text" id="read-summary">{{ summary }}</span>
+                            <button onclick="speakSummary()" class="btn btn-custom me-2" width="5px">🔊 Speak </button>
+                            <button onclick="stopSummary()" class="btn btn-custom me-2" width="5px">⏹ Stop </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -312,7 +349,7 @@
         <div class="row">
             {% if news %}
                 {% for article in news %}
-                <div class="col-md-4 mb-4">
+                <div class="col-md-4 mb-4 article-card">
                     <div class="card h-100 card-custom">
                         {% if article.imageurl %}
                             <img src="{{ article.imageurl }}" class="card-img-top" alt="News Image" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
@@ -387,6 +424,14 @@
                     </div>
                 </div>
             {% endif %}
+        </div>
+
+        <div class="pagination-container">
+            <nav aria-label="Page navigation">
+                <ul class="pagination" id="pagination-controls">
+                    <!-- Page number links -->
+                </ul>
+            </nav>
         </div>
 
         <!-- ========== QUICK STATS SECTION ========== -->
@@ -510,6 +555,76 @@
     function stopSummary() {
         window.speechSynthesis.cancel();
     }
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const itemsPerPage = 12;
+            const articles = document.querySelectorAll('.article-card');
+            const paginationContainer = document.getElementById('pagination-controls');
+            const totalPages = Math.ceil(articles.length / itemsPerPage);
+            let currentPage = 1;
+
+            function showPage(page) {
+                if (page < 1 || page > totalPages) return;
+                
+                currentPage = page;
+                const start = (page - 1) * itemsPerPage;
+                const end = start + itemsPerPage;
+
+                articles.forEach((article, index) => {
+                    if (index >= start && index < end) {
+                        article.style.display = 'block';
+                    } else {
+                        article.style.display = 'none';
+                    }
+                });
+
+                renderPaginationControls();
+                document.getElementById('articles-container').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            function renderPaginationControls() {
+                let html = '';
+                
+                // Previous Button
+                html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="#" onclick="event.preventDefault(); changePage(${currentPage - 1})">Previous</a>
+                         </li>`;
+
+                // Page Numbers
+                const maxVisibleButtons = 5;
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisibleButtons / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisibleButtons - 1);
+
+                if (endPage - startPage + 1 < maxVisibleButtons) {
+                    startPage = Math.max(1, endPage - maxVisibleButtons + 1);
+                }
+
+                for (let i = startPage; i <= endPage; i++) {
+                    html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                                <a class="page-link" href="#" onclick="event.preventDefault(); changePage(${i})">${i}</a>
+                             </li>`;
+                }
+
+                // Next Button
+                html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="#" onclick="event.preventDefault(); changePage(${currentPage + 1})">Next</a>
+                         </li>`;
+
+                paginationContainer.innerHTML = html;
+            }
+
+            // Expose function to global scope so onclick handlers can find it
+            window.changePage = function(page) {
+                showPage(page);
+            };
+
+            // Initial render
+            if (articles.length > 0) {
+                showPage(1);
+            }
+        });
     </script>
 </body>
 </html>
